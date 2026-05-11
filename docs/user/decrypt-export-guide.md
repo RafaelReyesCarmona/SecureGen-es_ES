@@ -37,18 +37,21 @@ Find `decrypt_export.html` in the root of the SecureGen project folder. Double-c
 
 | Column | Description |
 |--------|-------------|
+| # | Row number |
 | Name | Service name (e.g. Google, GitHub) |
 | Secret | Base32 secret key |
 | Type | TOTP (time-based) or HOTP (counter-based) |
 | Algorithm | SHA1, SHA256, or SHA512 |
 | Digits | 6 or 8 digit code |
-| Period / Counter | TOTP: interval in seconds (30 or 60). HOTP: current counter value |
+| Period / Counter | TOTP: interval in seconds (custom, usually 30 or 60). HOTP: current counter value |
 
 ### Passwords — table columns
 
 | Column | Description |
 |--------|-------------|
+| # | Row number |
 | Name | Entry label |
+| Category | Entry classification (None, Web, App, Local, Key / Token) |
 | Password | Hidden by default — click 👁️ to reveal |
 | Strength | Security indicators: locks (1-3), DUP, PIN, NAME badges. Updates live when editing |
 

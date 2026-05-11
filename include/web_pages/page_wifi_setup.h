@@ -485,9 +485,9 @@ const char wifi_setup_html[] PROGMEM = R"rawliteral(
             });
         }
 
-        // Auto-scan networks on page load
         document.addEventListener('DOMContentLoaded', function() {
-            scanNetworks();
+            const select = document.getElementById('ssid');
+            if (select) select.innerHTML = '<option value="">Click 🔄 Refresh Networks to scan</option>';
         });
     </script>
 </body>

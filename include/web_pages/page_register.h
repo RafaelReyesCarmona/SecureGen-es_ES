@@ -174,6 +174,7 @@ const char page_register[] PROGMEM = R"rawliteral(
                 <li id="lowercase">A lowercase letter</li>
                 <li id="number">A number</li>
                 <li id="special">A special character (!@#$%)</li>
+                <li id="no-username">Password must not contain your username</li>
             </ul>
             <div class="input-group">
                 <label for="confirm-password">Confirm Password</label>
@@ -242,6 +243,7 @@ const char page_register[] PROGMEM = R"rawliteral(
         const lowercaseCheck = document.getElementById('lowercase');
         const numberCheck = document.getElementById('number');
         const specialCheck = document.getElementById('special');
+        const noUsernameCheck = document.getElementById('no-username');
         const confirmMessage = document.getElementById('confirm-message');
 
         const criteria = {
@@ -249,16 +251,24 @@ const char page_register[] PROGMEM = R"rawliteral(
             uppercase: { el: uppercaseCheck, regex: /[A-Z]/ },
             lowercase: { el: lowercaseCheck, regex: /[a-z]/ },
             number: { el: numberCheck, regex: /[0-9]/ },
-            special: { el: specialCheck, regex: /[!@#$%]/ }
+            special: { el: specialCheck, regex: /[!@#$%]/ },
+            noUsername: { el: noUsernameCheck, test: null }
         };
 
         function validatePassword() {
             const password = passwordInput.value;
             let allValid = true;
+            // Update noUsername test dynamically based on current username
+            const currentUsername = usernameInput.value.trim().toLowerCase();
+            const pwLower = password.toLowerCase();
+            const usernameWords = currentUsername.match(/[a-z]{3,}/g) || [];
+            criteria.noUsername.test = () => usernameWords.length === 0 || !usernameWords.some(w => pwLower.includes(w));
+            
             for (const key in criteria) {
-                const isValid = criteria[key].regex.test(password);
-                criteria[key].el.classList.toggle('valid', isValid);
-                if (!isValid) allValid = false;
+                const crit = criteria[key];
+                const valid = crit.regex ? crit.regex.test(password) : (crit.test ? crit.test() : true);
+                crit.el.classList.toggle('valid', valid);
+                if (!valid) allValid = false;
             }
             return allValid;
         }

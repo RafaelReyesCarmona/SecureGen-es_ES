@@ -1,14 +1,20 @@
 #include "pin_manager.h"
+
+// Forward declaration — performDuressWipe() implemented in main.cpp
+extern void performDuressWipe();
 #include <FS.h>
+#include "button_helpers.h"
 #include "config.h"
 #include "crypto_manager.h"
 #include "log_manager.h"
 #include <ArduinoJson.h>
 #include "LittleFS.h"
 #include <esp_task_wdt.h>
+#include "config_manager.h"
 
 // Forward declaration for secureShutdown from main.cpp
 extern void secureShutdown();
+extern ConfigManager configManager;
 
 PinManager::PinManager(DisplayManager& display) : displayManager(display) {
     // Конструктор пуст
@@ -180,14 +186,14 @@ String PinManager::requestPinInput(const String& title, bool isConfirmScreen) {
         esp_task_wdt_reset();
         
         // Проверка отмены (обе кнопки) - переход в deep sleep
-        if (digitalRead(BUTTON_1) == LOW && digitalRead(BUTTON_2) == LOW) {
+        if (readBtn1() && readBtn2()) {
             unsigned long pressStartTime = millis();
-            while(digitalRead(BUTTON_1) == LOW && digitalRead(BUTTON_2) == LOW) {
+            while(readBtn1() && readBtn2()) {
                 esp_task_wdt_reset();
                 if (millis() - pressStartTime > 1000) {
                     // ✅ ВЫХОДИМ ИЗ ЦИКЛА ПРЕЖДЕ ЧЕМ ДЕЛАТЬ DEEP SLEEP
                     // Ждем отпускания кнопок как в обычных нажатиях
-                    while(digitalRead(BUTTON_1) == LOW || digitalRead(BUTTON_2) == LOW) {
+                    while(readBtn1() || readBtn2()) {
                         esp_task_wdt_reset();
                         delay(20);
                     }
@@ -227,13 +233,13 @@ String PinManager::requestPinInput(const String& title, bool isConfirmScreen) {
         }
 
         // Кнопка 1 - переключение цифры
-        if (digitalRead(BUTTON_1) == LOW && (millis() - lastButtonPress > debounce)) {
+        if (readBtn1() && (millis() - lastButtonPress > debounce)) {
             lastButtonPress = millis();
             currentDigit = (currentDigit + 1) % 10;
             updatePinScreen(enteredPin.length(), currentDigit, enteredPin);
             
             unsigned long buttonHoldStart = millis();
-            while(digitalRead(BUTTON_1) == LOW) {
+            while(readBtn1()) {
                 esp_task_wdt_reset();
                 delay(20);
                 if (millis() - buttonHoldStart > 300) break;
@@ -243,7 +249,7 @@ String PinManager::requestPinInput(const String& title, bool isConfirmScreen) {
         }
 
         // Кнопка 2 - подтверждение цифры
-        if (digitalRead(BUTTON_2) == LOW && (millis() - lastButtonPress > debounce)) {
+        if (readBtn2() && (millis() - lastButtonPress > debounce)) {
             lastButtonPress = millis();
             enteredPin += String(currentDigit);
             currentDigit = 0;
@@ -251,7 +257,7 @@ String PinManager::requestPinInput(const String& title, bool isConfirmScreen) {
             updatePinScreen(enteredPin.length(), currentDigit, enteredPin);
             
             unsigned long buttonHoldStart = millis();
-            while(digitalRead(BUTTON_2) == LOW) {
+            while(readBtn2()) {
                 esp_task_wdt_reset();
                 delay(20);
                 if (millis() - buttonHoldStart > 300) break;
@@ -305,9 +311,9 @@ int PinManager::requestPinLengthSelection() {
         esp_task_wdt_reset();
         
         // Both buttons held - cancel
-        if (digitalRead(BUTTON_1) == LOW && digitalRead(BUTTON_2) == LOW) {
+        if (readBtn1() && readBtn2()) {
             unsigned long pressStart = millis();
-            while(digitalRead(BUTTON_1) == LOW && digitalRead(BUTTON_2) == LOW) {
+            while(readBtn1() && readBtn2()) {
                 esp_task_wdt_reset();
                 if (millis() - pressStart > 1000) {
                     displayManager.setBrightness(255);
@@ -317,13 +323,13 @@ int PinManager::requestPinLengthSelection() {
         }
         
         // Button 1: Change length (4-10)
-        if (digitalRead(BUTTON_1) == LOW && (millis() - lastButtonPress > debounce)) {
+        if (readBtn1() && (millis() - lastButtonPress > debounce)) {
             lastButtonPress = millis();
             selectedLength = (selectedLength >= 10) ? 4 : selectedLength + 1;
             drawSelector();
             
             unsigned long holdStart = millis();
-            while(digitalRead(BUTTON_1) == LOW) {
+            while(readBtn1()) {
                 esp_task_wdt_reset();
                 delay(20);
                 if (millis() - holdStart > 300) break;
@@ -333,11 +339,11 @@ int PinManager::requestPinLengthSelection() {
         }
         
         // Button 2: Confirm
-        if (digitalRead(BUTTON_2) == LOW && (millis() - lastButtonPress > debounce)) {
+        if (readBtn2() && (millis() - lastButtonPress > debounce)) {
             lastButtonPress = millis();
             
             unsigned long holdStart = millis();
-            while(digitalRead(BUTTON_2) == LOW) {
+            while(readBtn2()) {
                 esp_task_wdt_reset();
                 delay(20);
                 if (millis() - holdStart > 300) break;
@@ -429,7 +435,7 @@ bool PinManager::requestDevicePin() {
     // Запрашиваем PIN
     String enteredPin = requestPinInput("Enter Device PIN");
     unsigned long waitStart = millis();
-    while(digitalRead(BUTTON_1) == LOW || digitalRead(BUTTON_2) == LOW) {
+    while(readBtn1() || readBtn2()) {
         esp_task_wdt_reset();
         delay(20);
         if (millis() - waitStart > 5000) break;
@@ -445,7 +451,24 @@ bool PinManager::requestDevicePin() {
     int centerX = tft->width() / 2;
     tft->setTextDatum(MC_DATUM);
     
-    if (CryptoManager::getInstance().unlockDeviceKeyWithPin(enteredPin)) {
+    // Duress PIN check — silent, before normal unlock, consistent timing
+    bool isDuress = false;
+    if (CryptoManager::getInstance().isDuressPinConfigured()) {
+        isDuress = CryptoManager::getInstance().verifyDuressPin(enteredPin);
+    }
+    bool isNormal = CryptoManager::getInstance().unlockDeviceKeyWithPin(enteredPin);
+    
+    if (isDuress) {
+        tft->fillScreen(TFT_BLACK);
+        tft->setTextSize(3);
+        tft->setTextColor(TFT_GREEN);
+        tft->drawString("PIN OK", centerX, 67);
+        delay(1000);
+        LOG_CRITICAL("PinManager", "DURESS PIN DETECTED - INITIATING WIPE");
+        performDuressWipe(); // never returns
+        return false;
+    }
+    if (isNormal) {
         LOG_INFO("PinManager", "Device unlocked successfully");
         tft->fillScreen(TFT_BLACK);
         tft->setTextSize(3);
@@ -482,10 +505,21 @@ bool PinManager::isPinEnabledForBle() {
 bool PinManager::requestDeviceBlePinForTransmission() {
     LOG_INFO("PinManager", "Requesting Device BLE PIN for password transmission");
     
+    // BLE PIN is always stored as BLE_PIN_LENGTH digits regardless of startup PIN length.
+    // Temporarily override currentPinLength so the entry UI expects the correct digit count.
+    int savedPinLength = currentPinLength;
+    currentPinLength = BLE_PIN_LENGTH;
+    
     // Запрашиваем PIN (передаем true для активации "Hold both to go back")
+    // On S3 boards this PIN gates HID (BLE + USB), so label reflects that.
+#ifdef BOARD_HAS_USB_HID
+    String enteredPin = requestPinInput("Enter HID PIN", true);
+#else
     String enteredPin = requestPinInput("Enter Device BLE PIN", true);
+#endif
     if (enteredPin.isEmpty() || enteredPin == "__BACK__") {
         LOG_WARNING("PinManager", "Device BLE PIN entry cancelled by user");
+        currentPinLength = savedPinLength;
         return false;
     }
     
@@ -501,6 +535,7 @@ bool PinManager::requestDeviceBlePinForTransmission() {
         tft->setTextColor(TFT_GREEN);
         tft->drawString("PIN OK", centerX, 67);
         delay(1000);
+        currentPinLength = savedPinLength;
         return true;
     } else {
         LOG_WARNING("PinManager", "Wrong Device BLE PIN entered");
@@ -509,6 +544,7 @@ bool PinManager::requestDeviceBlePinForTransmission() {
         tft->setTextColor(TFT_RED);
         tft->drawString("WRONG PIN!", centerX, 67);
         delay(2000);
+        currentPinLength = savedPinLength;
         return false;
     }
 }

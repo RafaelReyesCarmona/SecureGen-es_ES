@@ -248,14 +248,7 @@ uint32_t BleKeyboardManager::onPassKeyRequest() {
 void BleKeyboardManager::onPassKeyNotify(uint32_t pass_key) {
     SECURITY_LOG("PassKey notification received");
     
-    // Отображаем PIN маленьким текстом внизу экрана (убран крупный текст по центру)
-    if (pDisplayManager) {
-        String pinMessage = "PIN: " + String(pass_key);
-        pDisplayManager->showMessage(pinMessage, 10, 110, false, 1); // Изменен размер на 1 и позиция на 110 (внизу)
-        SECURITY_LOG("PIN displayed on device screen");
-    } else {
-        SECURITY_LOG("WARNING: DisplayManager not set, PIN not shown on screen");
-    }
+    // PIN is already displayed on the broadcasting screen — no additional draw needed.
 }
 
 bool BleKeyboardManager::onSecurityRequest() {

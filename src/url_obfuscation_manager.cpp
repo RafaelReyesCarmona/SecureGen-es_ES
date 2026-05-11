@@ -61,12 +61,14 @@ bool URLObfuscationManager::begin() {
     registerCriticalEndpoint("/api/import_export_status", "API Access Status");
     registerCriticalEndpoint("/api/theme", "Display Theme");
     registerCriticalEndpoint("/api/display_settings", "Display Settings");
+    registerCriticalEndpoint("/api/display/rotation", "Display Rotation");
     registerCriticalEndpoint("/api/splash/mode", "Splash Screen Selection");
     registerCriticalEndpoint("/api/clock_settings", "Clock Display Settings");
     registerCriticalEndpoint("/api/rtc", "DS3231 RTC Module");
     registerCriticalEndpoint("/api/battery", "battery_status");
     registerCriticalEndpoint("/api/boot-mode", "Boot Mode Selection");
     registerCriticalEndpoint("/api/hid-mode", "HID Mode Selection (BLE/USB)");
+    registerCriticalEndpoint("/api/duress_pin_update", "duress_pin_update");
     registerCriticalEndpoint("/api/ble_pin_update", "BLE PIN Update");
     registerCriticalEndpoint("/api/clear_ble_clients", "Clear BLE Clients");
     registerCriticalEndpoint("/api/ble_settings", "BLE Device Settings");

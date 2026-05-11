@@ -247,7 +247,13 @@ void WebServerManager::start() {
     }
     
     _timeoutMinutes = configManager.getWebServerTimeout();
-    LOG_INFO("WebServer", "Starting web server with timeout: " + String(_timeoutMinutes) + " minutes");
+    // In AP mode, web server runs permanently — disable inactivity timeout
+    if (configManager.getBootMode() == "ap") {
+        _timeoutMinutes = 0;
+        LOG_INFO("WebServer", "AP mode — web server timeout disabled (runs permanently)");
+    } else {
+        LOG_INFO("WebServer", "Starting web server with timeout: " + String(_timeoutMinutes) + " minutes");
+    }
     resetActivityTimer();
     
     // КРИТИЧНО: Попытаться загрузить персистентную сессию при старте
@@ -488,9 +494,17 @@ void WebServerManager::start() {
                 // КРИТИЧНО: Сохраняем новую сессию в зашифрованное хранилище
                 savePersistentSession();
                 
+                unsigned long cookieMaxAge = configManager.getSessionLifetimeSeconds();
+                if (cookieMaxAge == 0) {
+                    // "Until reboot" mode: use 24h as Max-Age so browser retains cookie,
+                    // server-side will still invalidate session on reboot via loadSession()
+                    cookieMaxAge = 86400;
+                }
+                
                 AsyncWebServerResponse *response = request->beginResponse(302, "text/plain", "Found");
                 response->addHeader("Location", "/");
-                response->addHeader("Set-Cookie", "session=" + session_id + "; Path=/; HttpOnly; SameSite=Strict");
+                response->addHeader("Set-Cookie", "session=" + session_id + 
+                    "; Path=/; HttpOnly; SameSite=Strict; Max-Age=" + String(cookieMaxAge));
                 // Security headers
                 response->addHeader("X-Content-Type-Options", "nosniff");
                 response->addHeader("X-Frame-Options", "DENY");
@@ -647,9 +661,17 @@ void WebServerManager::start() {
                     
                     savePersistentSession();
                     
+                    unsigned long cookieMaxAge = configManager.getSessionLifetimeSeconds();
+                    if (cookieMaxAge == 0) {
+                        // "Until reboot" mode: use 24h as Max-Age so browser retains cookie,
+                        // server-side will still invalidate session on reboot via loadSession()
+                        cookieMaxAge = 86400;
+                    }
+                    
                     AsyncWebServerResponse *response = request->beginResponse(302, "text/plain", "Found");
                     response->addHeader("Location", "/");
-                    response->addHeader("Set-Cookie", "session=" + session_id + "; Path=/; HttpOnly; SameSite=Strict");
+                    response->addHeader("Set-Cookie", "session=" + session_id + 
+                        "; Path=/; HttpOnly; SameSite=Strict; Max-Age=" + String(cookieMaxAge));
                     response->addHeader("X-Content-Type-Options", "nosniff");
                     response->addHeader("X-Frame-Options", "DENY");
                     response->addHeader("X-XSS-Protection", "1; mode=block");
@@ -1950,6 +1972,9 @@ void WebServerManager::start() {
                 JsonObject obj = array.add<JsonObject>();
                 obj["name"] = entry.name;
                 obj["password"] = entry.password; // Добавляем пароли для корректного отображения в веб-интерфейсе
+                obj["strength"] = entry.strength;
+                obj["pw_hash"] = entry.pw_hash;
+                obj["category"] = entry.category;
             }
             String output;
             serializeJson(doc, output);
@@ -2000,7 +2025,7 @@ void WebServerManager::start() {
             if (!isAuthenticated(request)) return request->send(401);
             if (!verifyCsrfToken(request)) return request->send(403, "text/plain", "CSRF token mismatch");
             
-            String name, password;
+            String name, password, category;
             
 #ifdef SECURE_LAYER_ENABLED
             String clientId = WebServerSecureIntegration::getClientId(request);
@@ -2016,9 +2041,10 @@ void WebServerManager::start() {
                 if (secureLayer.decryptRequest(clientId, encryptedBody, decryptedBody)) {
                     LOG_DEBUG("WebServer", "🔐 Decrypted password add body length: " + String(decryptedBody.length()) + " bytes");
                     
-                    // Парсим расшифрованные данные (формат: name=MyPassword&password=secret123)
+                    // Парсим расшифрованные данные (формат: name=MyPassword&password=secret123&category=web)
                     int nameStart = decryptedBody.indexOf("name=");
                     int passwordStart = decryptedBody.indexOf("password=");
+                    int categoryStart = decryptedBody.indexOf("category=");
                     
                     if (nameStart >= 0 && passwordStart >= 0) {
                         // Извлекаем name
@@ -2031,9 +2057,17 @@ void WebServerManager::start() {
                         if (passwordEnd == -1) passwordEnd = decryptedBody.length();
                         password = decryptedBody.substring(passwordStart + 9, passwordEnd); // skip "password="
                         
+                        // Извлекаем category (optional)
+                        if (categoryStart >= 0) {
+                            int categoryEnd = decryptedBody.indexOf("&", categoryStart);
+                            if (categoryEnd == -1) categoryEnd = decryptedBody.length();
+                            category = decryptedBody.substring(categoryStart + 9, categoryEnd); // skip "category="
+                        }
+                        
                         // URL decode
                         name.replace("+", " ");
                         password.replace("+", " ");
+                        category.replace("+", " ");
                         
                         LOG_DEBUG("WebServer", "🔐 Parsed password add: name=" + name + ", password length=" + String(password.length()));
                     } else {
@@ -2050,6 +2084,9 @@ void WebServerManager::start() {
                 if (request->hasParam("name", true) && request->hasParam("password", true)) {
                     name = request->getParam("name", true)->value();
                     password = request->getParam("password", true)->value();
+                    if (request->hasParam("category", true)) {
+                        category = request->getParam("category", true)->value();
+                    }
                 } else {
                     return request->send(400, "text/plain", "Missing required parameters");
                 }
@@ -2059,7 +2096,7 @@ void WebServerManager::start() {
                 return request->send(400, "text/plain", "Name and password cannot be empty");
             }
             
-            passwordManager.addPassword(name, password);
+            passwordManager.addPassword(name, password, category);
             
             String response = "Password added successfully!";
             
@@ -2205,6 +2242,7 @@ void WebServerManager::start() {
                     JsonDocument doc;
                     doc["name"] = passwords[index].name;
                     doc["password"] = passwords[index].password;
+                    doc["category"] = passwords[index].category;
                     String output;
                     serializeJson(doc, output);
                     
@@ -2240,7 +2278,7 @@ void WebServerManager::start() {
             if (!verifyCsrfToken(request)) return request->send(403, "text/plain", "CSRF token mismatch");
             
             int indexVal;
-            String name, password;
+            String name, password, category;
             
 #ifdef SECURE_LAYER_ENABLED
             String clientId = WebServerSecureIntegration::getClientId(request);
@@ -2256,10 +2294,11 @@ void WebServerManager::start() {
                 if (secureLayer.decryptRequest(clientId, encryptedBody, decryptedBody)) {
                     LOG_DEBUG("WebServer", "🔐 Decrypted password update body length: " + String(decryptedBody.length()) + " bytes");
                     
-                    // Парсим расшифрованные данные (формат: index=0&name=test&password=pass)
+                    // Парсим расшифрованные данные (формат: index=0&name=test&password=pass&category=web)
                     int indexStart = decryptedBody.indexOf("index=");
                     int nameStart = decryptedBody.indexOf("name=");
                     int passwordStart = decryptedBody.indexOf("password=");
+                    int categoryStart = decryptedBody.indexOf("category=");
                     
                     if (indexStart >= 0 && nameStart >= 0 && passwordStart >= 0) {
                         // Извлекаем index
@@ -2278,9 +2317,17 @@ void WebServerManager::start() {
                         if (passwordEnd == -1) passwordEnd = decryptedBody.length();
                         password = decryptedBody.substring(passwordStart + 9, passwordEnd);
                         
+                        // Извлекаем category (optional)
+                        if (categoryStart >= 0) {
+                            int categoryEnd = decryptedBody.indexOf("&", categoryStart);
+                            if (categoryEnd == -1) categoryEnd = decryptedBody.length();
+                            category = decryptedBody.substring(categoryStart + 9, categoryEnd); // skip "category="
+                        }
+                        
                         // URL decode
                         name.replace("+", " ");
                         password.replace("+", " ");
+                        category.replace("+", " ");
                         
                         LOG_DEBUG("WebServer", "🔐 Parsed: index=" + String(indexVal) + ", name=" + name + ", password length=" + String(password.length()));
                     } else {
@@ -2298,6 +2345,9 @@ void WebServerManager::start() {
                     indexVal = request->getParam("index", true)->value().toInt();
                     name = request->getParam("name", true)->value();
                     password = request->getParam("password", true)->value();
+                    if (request->hasParam("category", true)) {
+                        category = request->getParam("category", true)->value();
+                    }
                 } else {
                     return request->send(400, "text/plain", "Missing required parameters");
                 }
@@ -2308,7 +2358,7 @@ void WebServerManager::start() {
             String response;
             int statusCode;
             
-            if (passwordManager.updatePassword(indexVal, name, password)) {
+            if (passwordManager.updatePassword(indexVal, name, password, category)) {
                 LOG_INFO("WebServer", "Password entry updated successfully");
                 response = "Password updated successfully!";
                 statusCode = 200;
@@ -2338,73 +2388,67 @@ void WebServerManager::start() {
         server.on(obfuscatedPasswordUpdatePath.c_str(), HTTP_POST, passwordUpdateHandler, NULL, passwordUpdateBodyHandler);
     }
     
-    // API: Passwords reordering (SECURE TESTING ENABLED + URL OBFUSCATION)
-    URLObfuscationIntegration::registerDualEndpointWithBody(server, "/api/passwords/reorder", HTTP_POST, 
-        [this](AsyncWebServerRequest *request){
+    // API: Passwords reordering (FIXED: Match keys reorder pattern)
+    auto passwordsReorderHandler = [this](AsyncWebServerRequest *request){
+        // Empty - all logic in body handler
+    };
+    
+    auto passwordsReorderBodyHandler = [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
+        if (index + len == total) {
             if (!isAuthenticated(request)) return request->send(401);
             if (!verifyCsrfToken(request)) return request->send(403, "text/plain", "CSRF token mismatch");
             
-            String response = "Passwords reordered successfully!";
-            
-#ifdef SECURE_LAYER_ENABLED
-            // КРИТИЧНО: Принудительное шифрование ответов для password операций
-            String clientId = WebServerSecureIntegration::getClientId(request);
-            bool isTunneled = request->hasHeader("X-Real-Method");
-            
-            if (clientId.length() > 0 && secureLayer.isSecureSessionValid(clientId)) {
-                LOG_INFO("WebServer", "🔐 PASSWORD REORDER ENCRYPTION: Securing response for client " + clientId.substring(0,8) + "..." + (isTunneled ? " [TUNNELED]" : " [DIRECT]"));
-                WebServerSecureIntegration::sendSecureResponse(request, 200, "text/plain", response, secureLayer);
-                return;
-            } else if (clientId.length() > 0) {
-                LOG_WARNING("WebServer", "🔐 PASSWORD REORDER FALLBACK: No valid secure session for " + clientId.substring(0,8) + "..., sending plaintext");
-            }
-#endif
-            
-            request->send(200, "text/plain", response);
-        }, [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
-            if (!isAuthenticated(request)) return;
-            
             String body = String((char*)data).substring(0, len);
             JsonDocument doc;
-            DeserializationError error = deserializeJson(doc, body);
-            
-            if (error) {
-                request->send(400, "text/plain", "Invalid JSON");
-                return;
+            if (deserializeJson(doc, body) != DeserializationError::Ok) {
+                return request->send(400, "text/plain", "Invalid JSON");
             }
             
             if (!doc["order"].is<JsonArray>()) {
-                request->send(400, "text/plain", "Missing or invalid 'order' field");
-                return;
+                return request->send(400, "text/plain", "Missing or invalid 'order' field");
             }
             
             std::vector<std::pair<String, int>> newOrder;
             JsonArray orderArray = doc["order"];
-            
             for (JsonObject item : orderArray) {
                 String name = item["name"];
                 int order = item["order"];
                 newOrder.push_back(std::make_pair(name, order));
             }
             
-            if (!passwordManager.reorderPasswords(newOrder)) {
-                String errorResponse = "Failed to reorder passwords";
-                
-#ifdef SECURE_LAYER_ENABLED
-                // КРИТИЧНО: Принудительное шифрование ошибок для password операций
-                String clientId = WebServerSecureIntegration::getClientId(request);
-                bool isTunneled = request->hasHeader("X-Real-Method");
-                
-                if (clientId.length() > 0 && secureLayer.isSecureSessionValid(clientId)) {
-                    LOG_INFO("WebServer", "🔐 PASSWORD REORDER ERROR ENCRYPTION: Securing error response for client " + clientId.substring(0,8) + "..." + (isTunneled ? " [TUNNELED]" : " [DIRECT]"));
-                    WebServerSecureIntegration::sendSecureResponse(request, 500, "text/plain", errorResponse, secureLayer);
-                    return;
-                }
-#endif
-                
-                request->send(500, "text/plain", errorResponse);
+            bool success = passwordManager.reorderPasswords(newOrder);
+            String response = success ? "Passwords reordered successfully!" : "Failed to reorder passwords";
+            int statusCode = success ? 200 : 500;
+            
+            if (success) {
+                LOG_INFO("WebServer", "Passwords reordered successfully");
+            } else {
+                LOG_ERROR("WebServer", "Failed to reorder passwords");
             }
-        }, urlObfuscation);
+
+#ifdef SECURE_LAYER_ENABLED
+            String clientId = WebServerSecureIntegration::getClientId(request);
+            bool isTunneled = request->hasHeader("X-Real-Method");
+            if (clientId.length() > 0 && secureLayer.isSecureSessionValid(clientId)) {
+                LOG_INFO("WebServer", "🔐 PASSWORD REORDER ENCRYPTION: Securing response for client " + clientId.substring(0,8) + "..." + (isTunneled ? " [TUNNELED]" : " [DIRECT]"));
+                WebServerSecureIntegration::sendSecureResponse(request, statusCode, "text/plain", response, secureLayer);
+                return;
+            } else if (clientId.length() > 0) {
+                LOG_WARNING("WebServer", "🔐 PASSWORD REORDER FALLBACK: No valid secure session for " + clientId.substring(0,8) + "..., sending plaintext");
+            }
+#endif
+            
+            request->send(statusCode, "text/plain", response);
+        }
+    };
+    
+    server.on("/api/passwords/reorder", HTTP_POST, passwordsReorderHandler, NULL, passwordsReorderBodyHandler);
+    {
+        String obfPath = urlObfuscation.obfuscateURL("/api/passwords/reorder");
+        if (obfPath.length() > 0 && obfPath != "/api/passwords/reorder") {
+            server.on(obfPath.c_str(), HTTP_POST, passwordsReorderHandler, NULL, passwordsReorderBodyHandler);
+        }
+    }
 
     // API: Export passwords (SECURE TESTING ENABLED + URL OBFUSCATION + REQUEST DECRYPTION)
     auto passwordExportHandler = [this](AsyncWebServerRequest *request){
@@ -2513,6 +2557,9 @@ void WebServerManager::start() {
                 JsonObject obj = array.add<JsonObject>();
                 obj["name"] = entry.name;
                 obj["password"] = entry.password;
+                obj["strength"] = entry.strength;
+                obj["pw_hash"] = entry.pw_hash;
+                obj["category"] = entry.category;
             }
             String plaintext;
             serializeJson(doc, plaintext);
@@ -3307,8 +3354,17 @@ void WebServerManager::start() {
         doc["length"] = pinManager.getPinLength();
         
         // Device BLE PIN status
-        doc["deviceBlePinEnabled"] = deviceBlePinEnabled;
+        doc["deviceBlePinEnabled"]   = deviceBlePinEnabled;
         doc["deviceBlePinConfigured"] = deviceBlePinConfigured;
+        doc["duressPinEnabled"]      = CryptoManager::getInstance().isDuressPinEnabled();
+        doc["duressPinConfigured"]   = CryptoManager::getInstance().isDuressPinConfigured();
+        
+        // Board capabilities
+#ifdef BOARD_HAS_USB_HID
+        doc["has_usb_hid"] = true;
+#else
+        doc["has_usb_hid"] = false;
+#endif
         
         // Legacy fields для обратной совместимости
         doc["enabled"] = pinProtectionEnabled;
@@ -3530,6 +3586,8 @@ void WebServerManager::start() {
                             LittleFS.remove(LOGIN_STATE_FILE);
                             LittleFS.remove("/rtc_config.json");
                             LittleFS.remove("/ble_pin.json.enc");
+                            LittleFS.remove("/device_ble_pin.json.enc");
+                            LittleFS.remove("/duress_pin.hash");
                             LittleFS.remove("/session.json.enc");
                             
                             // URL Obfuscation: Удаление boot counter и всех mappings
@@ -3645,12 +3703,10 @@ void WebServerManager::start() {
             if (!verifyCsrfToken(request)) return request->send(403, "text/plain", "CSRF token mismatch");
             
             // 🔐 ОБРАБОТКА ЗАШИФРОВАННЫХ И ОБЫЧНЫХ ПАРАМЕТРОВ
-            String bleBondingPinStr = "";
             String deviceBlePinStr = "";
             bool deviceBlePinEnabled = false;
             bool deviceBlePinEnabledProvided = false; // Флаг что параметр был передан
             bool isEncrypted = false;
-            bool hasBondingPin = false;
             bool hasDevicePin = false;
             
             String clientId = WebServerSecureIntegration::getClientId(request);
@@ -3681,10 +3737,7 @@ void WebServerManager::start() {
                         value.replace("%26", "&");
                         value.replace("+", " ");
                         
-                        if (key == "ble_bonding_pin") {
-                            bleBondingPinStr = value;
-                            hasBondingPin = (value.length() > 0 && value != "null");
-                        } else if (key == "device_ble_pin") {
+                        if (key == "device_ble_pin") {
                             deviceBlePinStr = value;
                             hasDevicePin = (value.length() > 0 && value != "null");
                         } else if (key == "device_ble_pin_enabled") {
@@ -3695,7 +3748,7 @@ void WebServerManager::start() {
                         pos = ampPos + 1;
                     }
                     
-                    LOG_INFO("WebServer", "🔐 BLE PIN DECRYPT: bonding=" + String(hasBondingPin) + ", device=" + String(hasDevicePin));
+                    LOG_INFO("WebServer", "🔐 BLE PIN DECRYPT: device=" + String(hasDevicePin));
                 } else {
                     LOG_WARNING("WebServer", "🔐 Failed to decrypt BLE PIN data, trying fallback parameters");
                 }
@@ -3703,11 +3756,6 @@ void WebServerManager::start() {
             
             // Fallback: обработка обычных параметров если расшифровка не удалась
             if (!isEncrypted) {
-                if (request->hasParam("ble_bonding_pin", true)) {
-                    bleBondingPinStr = request->getParam("ble_bonding_pin", true)->value();
-                    hasBondingPin = (bleBondingPinStr.length() > 0 && bleBondingPinStr != "null");
-                    LOG_DEBUG("WebServer", "BLE Bonding PIN received, length=" + String(bleBondingPinStr.length()));
-                }
                 if (request->hasParam("device_ble_pin", true)) {
                     deviceBlePinStr = request->getParam("device_ble_pin", true)->value();
                     hasDevicePin = (deviceBlePinStr.length() > 0 && deviceBlePinStr != "null");
@@ -3717,56 +3765,14 @@ void WebServerManager::start() {
                     deviceBlePinEnabled = (deviceBlePinEnabledValue == "true");
                     deviceBlePinEnabledProvided = (deviceBlePinEnabledValue.length() > 0 && deviceBlePinEnabledValue != "null"); // Параметр был передан
                 }
-                LOG_INFO("WebServer", "🔐 BLE PIN FALLBACK: bonding=" + String(hasBondingPin) + ", device=" + String(hasDevicePin));
+                LOG_INFO("WebServer", "🔐 BLE PIN FALLBACK: device=" + String(hasDevicePin));
             }
             
             String message;
             int statusCode = 200;
             bool success = true;
             
-            LOG_INFO("WebServer", "🔐 [MAIN] BLE PIN UPDATE: hasBondingPin=" + String(hasBondingPin) + ", hasDevicePin=" + String(hasDevicePin));
-            
-            // Обработка BLE Bonding PIN
-            if (hasBondingPin) {
-                if (bleBondingPinStr.length() != 6) {
-                    message = "BLE Bonding PIN must be exactly 6 digits";
-                    statusCode = 400;
-                    success = false;
-                } else {
-                    bool validDigits = true;
-                    for (char c : bleBondingPinStr) {
-                        if (!isdigit(c)) {
-                            validDigits = false;
-                            break;
-                        }
-                    }
-                    
-                    if (!validDigits) {
-                        message = "BLE Bonding PIN must contain only digits";
-                        statusCode = 400;
-                        success = false;
-                    } else {
-                        uint32_t blePin = bleBondingPinStr.toInt();
-                        
-                        if (CryptoManager::getInstance().saveBlePin(blePin)) {
-                            LOG_INFO("WebServer", "BLE Bonding PIN updated successfully");
-                            
-                            // Clear all BLE bonding keys when PIN changes for security
-                            if (bleKeyboardManager) {
-                                bleKeyboardManager->clearBondingKeys();
-                                LOG_INFO("WebServer", "BLE bonding keys cleared due to PIN change");
-                            }
-                            
-                            message = "BLE Bonding PIN updated successfully! All BLE clients cleared.";
-                        } else {
-                            LOG_ERROR("WebServer", "Failed to save BLE Bonding PIN");
-                            message = "Failed to save BLE Bonding PIN";
-                            statusCode = 500;
-                            success = false;
-                        }
-                    }
-                }
-            }
+            LOG_INFO("WebServer", "🔐 [MAIN] BLE PIN UPDATE: hasDevicePin=" + String(hasDevicePin));
             
             // Обработка Device BLE PIN
             if (success && hasDevicePin) {
@@ -3800,12 +3806,7 @@ void WebServerManager::start() {
                         
                         if (CryptoManager::getInstance().saveDeviceBlePin(devicePin)) {
                             LOG_INFO("WebServer", "Device BLE PIN updated successfully");
-                            
-                            if (hasBondingPin) {
-                                message += " Device BLE PIN also updated.";
-                            } else {
-                                message = "Device BLE PIN updated successfully!";
-                            }
+                            message = "Device BLE PIN updated successfully!";
                         } else {
                             LOG_ERROR("WebServer", "Failed to save Device BLE PIN");
                             message = "Failed to save Device BLE PIN";
@@ -3828,7 +3829,7 @@ void WebServerManager::start() {
                 }
             }
             
-            if (!hasBondingPin && !hasDevicePin) {
+            if (!hasDevicePin) {
                 message = "No PIN parameters provided";
                 statusCode = 400;
                 success = false;
@@ -3858,6 +3859,63 @@ void WebServerManager::start() {
         }
     };
     
+    // Регистрируем оба варианта: оригинальный и обфусцированный (как у других endpoints)
+    server.on("/api/duress_pin_update", HTTP_POST,
+        [this](AsyncWebServerRequest *request) {
+            if (!isAuthenticated(request)) return request->send(401);
+            if (!verifyCsrfToken(request)) return request->send(403, "text/plain", "CSRF token mismatch");
+        },
+        NULL,
+        [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+            if (index + len < total) return;
+            if (!isAuthenticated(request)) return request->send(401);
+            if (!verifyCsrfToken(request)) return request->send(403, "text/plain", "CSRF token mismatch");
+
+            String duressPinStr = ""; bool hasDuressPin = false;
+            bool duressPinEnabled = false; bool duressPinEnabledProvided = false;
+            bool isEncrypted = false; bool success = true;
+            int statusCode = 200; String message = "";
+
+            String clientId = WebServerSecureIntegration::getClientId(request);
+            if (clientId.length() > 0 && secureLayer.isSecureSessionValid(clientId) && len > 0) {
+                String encBody = String((char*)data, len); String decBody;
+                if (secureLayer.decryptRequest(clientId, encBody, decBody)) {
+                    isEncrypted = true;
+                    int start = 0;
+                    while (start < (int)decBody.length()) {
+                        int eq = decBody.indexOf('=', start); if (eq < 0) break;
+                        int amp = decBody.indexOf('&', eq); if (amp < 0) amp = decBody.length();
+                        String key = decBody.substring(start, eq);
+                        String value = decBody.substring(eq + 1, amp);
+                        if (key == "duress_pin") { duressPinStr = value; hasDuressPin = (value.length() > 0 && value != "null"); }
+                        else if (key == "duress_pin_enabled") { duressPinEnabled = (value == "true"); duressPinEnabledProvided = (value.length() > 0 && value != "null"); }
+                        start = amp + 1;
+                    }
+                }
+            }
+            if (!isEncrypted) {
+                if (request->hasParam("duress_pin", true)) { duressPinStr = request->getParam("duress_pin", true)->value(); hasDuressPin = (duressPinStr.length() > 0 && duressPinStr != "null"); }
+                if (request->hasParam("duress_pin_enabled", true)) { String v = request->getParam("duress_pin_enabled", true)->value(); duressPinEnabled = (v == "true"); duressPinEnabledProvided = (v.length() > 0 && v != "null"); }
+            }
+
+            if (hasDuressPin) {
+                int expected = pinManager.getPinLength();
+                bool allDigits = ((int)duressPinStr.length() == expected);
+                for (char c : duressPinStr) { if (!isdigit(c)) { allDigits = false; break; } }
+                if (!allDigits) { message = "Duress PIN must be " + String(expected) + " digits"; statusCode = 400; success = false; }
+                else if (CryptoManager::getInstance().saveDuressPin(duressPinStr)) { message = "Duress PIN saved successfully!"; LOG_INFO("WebServer","Duress PIN saved"); }
+                else { message = "Failed to save Duress PIN"; statusCode = 500; success = false; }
+            } else if (!hasDuressPin && duressPinEnabledProvided && !duressPinEnabled) {
+                if (CryptoManager::getInstance().isDuressPinConfigured()) { CryptoManager::getInstance().setDuressPinEnabled(false); message = "Duress PIN disabled successfully!"; LOG_INFO("WebServer","Duress PIN disabled"); }
+                else { message = "Duress PIN not configured"; statusCode = 400; success = false; }
+            } else { message = "No Duress PIN parameters provided"; statusCode = 400; success = false; }
+
+            JsonDocument doc; doc["success"] = success; doc["message"] = message;
+            String response; serializeJson(doc, response);
+            WebServerSecureIntegration::sendSecureResponse(request, statusCode, "application/json", response, secureLayer);
+        }
+    );
+
     // Регистрируем оба варианта: оригинальный и обфусцированный (как у других endpoints)
     server.on("/api/ble_pin_update", HTTP_POST, blePinUpdateHandler, NULL, blePinUpdateBodyHandler);
     String obfuscatedBlePinUpdatePath = urlObfuscation.obfuscateURL("/api/ble_pin_update");
@@ -4140,9 +4198,11 @@ void WebServerManager::start() {
         
         uint16_t displayTimeout = configManager.getDisplayTimeout();
         uint32_t autoLockTimeout = configManager.getAutoLockTimeout();
+        uint16_t dimTimeout = configManager.getDimTimeout();
         JsonDocument doc;
         doc["display_timeout"] = displayTimeout;
         doc["auto_lock_timeout"] = autoLockTimeout;
+        doc["dim_timeout"] = dimTimeout;
         String output;
         serializeJson(doc, output);
         
@@ -4175,6 +4235,8 @@ void WebServerManager::start() {
                 }
                 
                 String timeoutStr;
+                String autoLockStr;
+                String dimTimeoutStr;
                 
 #ifdef SECURE_LAYER_ENABLED
                 String clientId = WebServerSecureIntegration::getClientId(request);
@@ -4199,10 +4261,24 @@ void WebServerManager::start() {
                             int timeoutEnd = decryptedBody.indexOf("&", timeoutStart);
                             if (timeoutEnd < 0) timeoutEnd = decryptedBody.length();
                             timeoutStr = decryptedBody.substring(timeoutStart + 16, timeoutEnd); // skip "display_timeout="
-                            
-                            // URL decode (если нужно)
                             timeoutStr = urlDecode(timeoutStr);
                             LOG_DEBUG("WebServer", "🔐 DISPLAY_SETTINGS: Parsed timeout=" + timeoutStr);
+                        }
+                        
+                        // Парсинг параметра auto_lock_timeout
+                        int alStart = decryptedBody.indexOf("auto_lock_timeout=");
+                        if (alStart >= 0) {
+                            int alEnd = decryptedBody.indexOf("&", alStart);
+                            if (alEnd < 0) alEnd = decryptedBody.length();
+                            autoLockStr = urlDecode(decryptedBody.substring(alStart + 18, alEnd));
+                        }
+                        
+                        // Парсинг параметра dim_timeout
+                        int dimStart = decryptedBody.indexOf("dim_timeout=");
+                        if (dimStart >= 0) {
+                            int dimEnd = decryptedBody.indexOf("&", dimStart);
+                            if (dimEnd < 0) dimEnd = decryptedBody.length();
+                            dimTimeoutStr = urlDecode(decryptedBody.substring(dimStart + 12, dimEnd));
                         }
                     } else {
                         LOG_ERROR("WebServer", "🔐 DISPLAY_SETTINGS: Decryption failed");
@@ -4214,6 +4290,12 @@ void WebServerManager::start() {
                     // Fallback: незашифрованный запрос
                     if (request->hasParam("display_timeout", true)) {
                         timeoutStr = request->getParam("display_timeout", true)->value();
+                    }
+                    if (request->hasParam("auto_lock_timeout", true)) {
+                        autoLockStr = request->getParam("auto_lock_timeout", true)->value();
+                    }
+                    if (request->hasParam("dim_timeout", true)) {
+                        dimTimeoutStr = request->getParam("dim_timeout", true)->value();
                     }
                 }
                 
@@ -4231,33 +4313,6 @@ void WebServerManager::start() {
                 }
                 
                 // Parse and validate auto_lock_timeout
-                String autoLockStr;
-#ifdef SECURE_LAYER_ENABLED
-                {
-                    String clientIdAl = WebServerSecureIntegration::getClientId(request);
-                    if (clientIdAl.length() > 0 && secureLayer.isSecureSessionValid(clientIdAl) &&
-                        (request->hasHeader("X-Secure-Request") || request->hasHeader("X-Security-Level"))) {
-                        // already decrypted into timeoutStr path above — re-parse for auto_lock
-                        String encBody2 = String((char*)data, len);
-                        String decBody2;
-                        if (secureLayer.decryptRequest(clientIdAl, encBody2, decBody2)) {
-                            int alStart = decBody2.indexOf("auto_lock_timeout=");
-                            if (alStart >= 0) {
-                                int alEnd = decBody2.indexOf("&", alStart);
-                                if (alEnd < 0) alEnd = decBody2.length();
-                                autoLockStr = urlDecode(decBody2.substring(alStart + 18, alEnd));
-                            }
-                        }
-                    } else {
-                        if (request->hasParam("auto_lock_timeout", true))
-                            autoLockStr = request->getParam("auto_lock_timeout", true)->value();
-                    }
-                }
-#else
-                if (request->hasParam("auto_lock_timeout", true))
-                    autoLockStr = request->getParam("auto_lock_timeout", true)->value();
-#endif
-                
                 uint32_t autoLockTimeout = autoLockStr.length() > 0 ? (uint32_t)autoLockStr.toInt() : configManager.getAutoLockTimeout();
                 
                 // Validate auto_lock_timeout values
@@ -4266,26 +4321,45 @@ void WebServerManager::start() {
                     return request->send(400, "text/plain", "Invalid auto lock timeout value!");
                 }
                 
-                // Cross-validation: auto lock must be > screen timeout (when both non-zero)
+                // Parse and validate dim_timeout
+                uint16_t dimTimeout = dimTimeoutStr.length() > 0 ? (uint16_t)dimTimeoutStr.toInt() : configManager.getDimTimeout();
+                
+                // Validate dim_timeout values
+                if (dimTimeout != 0 && dimTimeout != 5 && dimTimeout != 10 && dimTimeout != 15 &&
+                    dimTimeout != 30 && dimTimeout != 60 && dimTimeout != 300) {
+                    return request->send(400, "text/plain", "Invalid dim timeout value!");
+                }
+                
+                // Cross-validation ladder: dim < display <= lock (each rule only when both non-zero)
+                if (dimTimeout > 0 && timeout > 0 && dimTimeout >= timeout) {
+                    return request->send(400, "text/plain", "Dim timeout must be less than screen timeout!");
+                }
                 if (timeout > 0 && autoLockTimeout > 0 && autoLockTimeout <= timeout) {
                     return request->send(400, "text/plain", "Auto lock timeout must be greater than screen timeout!");
                 }
+                if (dimTimeout > 0 && autoLockTimeout > 0 && dimTimeout >= autoLockTimeout) {
+                    return request->send(400, "text/plain", "Dim timeout must be less than auto lock timeout!");
+                }
+                
+                // Save all three timeouts
+                bool screenSaved = configManager.saveDisplayTimeout(timeout);
+                bool autoLockSaved = configManager.saveAutoLockTimeout(autoLockTimeout);
+                bool dimSaved = configManager.saveDimTimeout(dimTimeout);
                 
                 // Сохранение таймаутов
                 String response;
                 int statusCode;
                 
                 JsonDocument doc;
-                bool screenSaved = configManager.saveDisplayTimeout(timeout);
-                bool autoLockSaved = configManager.saveAutoLockTimeout(autoLockTimeout);
                 
-                if (screenSaved && autoLockSaved) {
+                if (screenSaved && autoLockSaved && dimSaved) {
                     doc["success"] = true;
                     doc["message"] = "Display settings saved successfully!";
                     doc["timeout"] = timeout;
                     doc["auto_lock_timeout"] = autoLockTimeout;
+                    doc["dim_timeout"] = dimTimeout;
                     statusCode = 200;
-                    LOG_INFO("WebServer", "Display timeout changed to: " + String(timeout) + "s, auto lock: " + String(autoLockTimeout) + "s");
+                    LOG_INFO("WebServer", "Display timeout changed to: " + String(timeout) + "s, auto lock: " + String(autoLockTimeout) + "s, dim: " + String(dimTimeout) + "s");
                 } else {
                     doc["success"] = false;
                     doc["message"] = "Failed to save display settings!";
@@ -4327,6 +4401,141 @@ void WebServerManager::start() {
         },
         NULL,
         NULL
+    );
+
+    // Display Rotation endpoints
+    server.on("/api/display/rotation", HTTP_GET, [this](AsyncWebServerRequest *request){
+        if (!isAuthenticated(request)) return request->send(401);
+        
+        uint8_t rotation = configManager.getDisplayRotation();
+        JsonDocument doc;
+        doc["rotation"] = rotation;
+        String output;
+        serializeJson(doc, output);
+        
+#ifdef SECURE_LAYER_ENABLED
+        String clientId = WebServerSecureIntegration::getClientId(request);
+        if (clientId.length() > 0 && secureLayer.isSecureSessionValid(clientId)) {
+            LOG_INFO("WebServer", "🔐 DISPLAY_ROTATION GET: Securing response for " + clientId.substring(0,8) + "...");
+            WebServerSecureIntegration::sendSecureResponse(request, 200, "application/json", output, secureLayer);
+            return;
+        }
+#endif
+        request->send(200, "application/json", output);
+    });
+
+    server.on("/api/display/rotation", HTTP_POST,
+        [this](AsyncWebServerRequest *request){
+            // Пустой основной обработчик - вся логика в onBody callback
+        },
+        NULL,
+        [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+            if (index + len == total) {
+                // Проверка аутентификации
+                if (!isAuthenticated(request)) {
+                    return request->send(401, "text/plain", "Unauthorized");
+                }
+                
+                // Проверка CSRF токена
+                if (!verifyCsrfToken(request)) {
+                    return request->send(403, "text/plain", "CSRF token mismatch");
+                }
+                
+                String rotationStr;
+                
+#ifdef SECURE_LAYER_ENABLED
+                String clientId = WebServerSecureIntegration::getClientId(request);
+                
+                if (clientId.length() > 0 && 
+                    secureLayer.isSecureSessionValid(clientId) &&
+                    (request->hasHeader("X-Secure-Request") || 
+                     request->hasHeader("X-Security-Level"))) {
+                    
+                    LOG_INFO("WebServer", "🔐 DISPLAY_ROTATION: Decrypting request for " + clientId.substring(0,8) + "...");
+                    
+                    // Расшифровка запроса
+                    String encryptedBody = String((char*)data, len);
+                    String decryptedBody;
+                    
+                    if (secureLayer.decryptRequest(clientId, encryptedBody, decryptedBody)) {
+                        LOG_DEBUG("WebServer", "🔐 DISPLAY_ROTATION: Decrypted body: " + decryptedBody);
+                        
+                        // Парсинг параметра rotation
+                        int rotStart = decryptedBody.indexOf("rotation=");
+                        if (rotStart >= 0) {
+                            int rotEnd = decryptedBody.indexOf("&", rotStart);
+                            if (rotEnd < 0) rotEnd = decryptedBody.length();
+                            rotationStr = decryptedBody.substring(rotStart + 9, rotEnd); // skip "rotation="
+                            
+                            // URL decode (если нужно)
+                            rotationStr = urlDecode(rotationStr);
+                            LOG_DEBUG("WebServer", "🔐 DISPLAY_ROTATION: Parsed rotation=" + rotationStr);
+                        }
+                    } else {
+                        LOG_ERROR("WebServer", "🔐 DISPLAY_ROTATION: Decryption failed");
+                        return request->send(400, "text/plain", "Decryption failed");
+                    }
+                } else
+#endif
+                {
+                    // Fallback: незашифрованный запрос
+                    if (request->hasParam("rotation", true)) {
+                        rotationStr = request->getParam("rotation", true)->value();
+                    }
+                }
+                
+                // Валидация rotation
+                if (rotationStr.length() == 0) {
+                    return request->send(400, "text/plain", "Missing rotation parameter!");
+                }
+                
+                uint8_t rotation = rotationStr.toInt();
+                
+                // Validate rotation values (0-3)
+                if (rotation > 3) {
+                    return request->send(400, "text/plain", "Invalid rotation value! Must be 0-3.");
+                }
+                
+                // Сохранение rotation
+                bool saved = configManager.saveDisplayRotation(rotation);
+                
+                if (saved) {
+                    // Update button helpers rotation
+                    extern uint8_t g_displayRotation;
+                    g_displayRotation = rotation;
+                    
+                    // Apply rotation immediately
+                    extern DisplayManager displayManager;
+                    displayManager.applyRotation();
+                    
+                    JsonDocument doc;
+                    doc["success"] = true;
+                    doc["message"] = "Display rotation updated successfully!";
+                    doc["rotation"] = rotation;
+                    String response;
+                    serializeJson(doc, response);
+                    
+                    LOG_INFO("WebServer", "Display rotation changed to: " + String(rotation));
+                    
+#ifdef SECURE_LAYER_ENABLED
+                    String clientId = WebServerSecureIntegration::getClientId(request);
+                    if (clientId.length() > 0 && secureLayer.isSecureSessionValid(clientId)) {
+                        LOG_INFO("WebServer", "🔐 DISPLAY_ROTATION: Securing response");
+                        WebServerSecureIntegration::sendSecureResponse(request, 200, "application/json", response, secureLayer);
+                        return;
+                    }
+#endif
+                    request->send(200, "application/json", response);
+                } else {
+                    JsonDocument doc;
+                    doc["success"] = false;
+                    doc["message"] = "Failed to save display rotation.";
+                    String response;
+                    serializeJson(doc, response);
+                    request->send(500, "application/json", response);
+                }
+            }
+        }
     );
 
     server.on("/api/theme", HTTP_GET, [this](AsyncWebServerRequest *request){
@@ -5516,6 +5725,9 @@ void WebServerManager::start() {
                         JsonObject obj = array.add<JsonObject>();
                         obj["name"] = entry.name;
                         obj["password"] = entry.password;  // Только name и password в PasswordEntry
+                        obj["strength"] = entry.strength;
+                        obj["pw_hash"] = entry.pw_hash;
+                        obj["category"] = entry.category;
                     }
                     String output;
                     serializeJson(doc, output);
@@ -5554,6 +5766,9 @@ void WebServerManager::start() {
                         JsonObject obj = array.add<JsonObject>();
                         obj["name"] = entry.name;
                         obj["password"] = entry.password;  // Только name и password в PasswordEntry
+                        obj["strength"] = entry.strength;
+                        obj["pw_hash"] = entry.pw_hash;
+                        obj["category"] = entry.category;
                     }
                     String plaintext;
                     serializeJson(doc, plaintext);
@@ -5627,10 +5842,11 @@ void WebServerManager::start() {
                     
                     String name = targetData["name"].as<String>();
                     String password = targetData["password"].as<String>();
+                    String category = targetData["category"] | "";
                     
                     LOG_INFO("WebServer", "🚇 TUNNELED Password add: " + name);
                     
-                    if (passwordManager.addPassword(name, password)) {
+                    if (passwordManager.addPassword(name, password, category)) {
                         LOG_INFO("WebServer", "🔐 Password added: " + name);
                         
                         JsonDocument responseDoc;
@@ -5705,6 +5921,7 @@ void WebServerManager::start() {
                         JsonDocument responseDoc;
                         responseDoc["name"] = pwd.name;
                         responseDoc["password"] = pwd.password;
+                        responseDoc["category"] = pwd.category;
                         String jsonResponse;
                         serializeJson(responseDoc, jsonResponse);
                         
@@ -5732,10 +5949,11 @@ void WebServerManager::start() {
                     int index = targetData["index"].as<int>();
                     String name = targetData["name"].as<String>();
                     String password = targetData["password"].as<String>();
+                    String category = targetData["category"] | "";
                     
                     LOG_INFO("WebServer", "🚇 TUNNELED Password update: index " + String(index) + ", name: " + name);
                     
-                    if (passwordManager.updatePassword(index, name, password)) {
+                    if (passwordManager.updatePassword(index, name, password, category)) {
                         LOG_INFO("WebServer", "🔐 Password updated at index: " + String(index));
                         
                         JsonDocument responseDoc;
@@ -5873,13 +6091,15 @@ void WebServerManager::start() {
                     
                     uint16_t displayTimeout = configManager.getDisplayTimeout();
                     uint32_t autoLockTimeout = configManager.getAutoLockTimeout();
+                    uint16_t dimTimeout = configManager.getDimTimeout();
                     JsonDocument doc;
                     doc["display_timeout"] = displayTimeout;
                     doc["auto_lock_timeout"] = autoLockTimeout;
+                    doc["dim_timeout"] = dimTimeout;
                     String output;
                     serializeJson(doc, output);
                     
-                    LOG_INFO("WebServer", "🚇 TUNNELED display_settings GET: timeout=" + String(displayTimeout) + " autoLock=" + String(autoLockTimeout));
+                    LOG_INFO("WebServer", "🚇 TUNNELED display_settings GET: timeout=" + String(displayTimeout) + " autoLock=" + String(autoLockTimeout) + " dim=" + String(dimTimeout));
                     LOG_INFO("WebServer", "🔐 DISPLAY_SETTINGS GET ENCRYPTION: Securing tunneled response [TUNNELED]");
                     WebServerSecureIntegration::sendSecureResponse(request, 200, "application/json", output, secureLayer);
                     return;
@@ -6138,6 +6358,85 @@ void WebServerManager::start() {
                     return;
                 }
                 
+                // 🎯 МАРШРУТИЗАЦИЯ: /api/display/rotation GET
+                if (targetEndpoint == "/api/display/rotation" && targetMethod == "GET") {
+                    if (request->hasHeader("X-User-Activity")) {
+                        resetActivityTimer();
+                    }
+                    
+                    uint8_t rotation = configManager.getDisplayRotation();
+                    JsonDocument doc;
+                    doc["rotation"] = rotation;
+                    String output;
+                    serializeJson(doc, output);
+                    
+                    LOG_INFO("WebServer", "🚇 TUNNELED display rotation GET: " + String(rotation));
+                    WebServerSecureIntegration::sendSecureResponse(request, 200, "application/json", output, secureLayer);
+                    return;
+                }
+                
+                // 🎯 МАРШРУТИЗАЦИЯ: /api/display/rotation POST
+                if (targetEndpoint == "/api/display/rotation" && targetMethod == "POST") {
+                    if (request->hasHeader("X-User-Activity")) {
+                        resetActivityTimer();
+                    }
+                    
+                    String rotationStr = targetData["rotation"].as<String>();
+                    
+                    if (rotationStr.length() == 0) {
+                        JsonDocument errorDoc;
+                        errorDoc["success"] = false;
+                        errorDoc["message"] = "Missing rotation parameter!";
+                        String errorResponse;
+                        serializeJson(errorDoc, errorResponse);
+                        WebServerSecureIntegration::sendSecureResponse(request, 400, "application/json", errorResponse, secureLayer);
+                        return;
+                    }
+                    
+                    uint8_t rotation = rotationStr.toInt();
+                    
+                    if (rotation > 3) {
+                        JsonDocument errorDoc;
+                        errorDoc["success"] = false;
+                        errorDoc["message"] = "Invalid rotation value! Must be 0-3.";
+                        String errorResponse;
+                        serializeJson(errorDoc, errorResponse);
+                        WebServerSecureIntegration::sendSecureResponse(request, 400, "application/json", errorResponse, secureLayer);
+                        return;
+                    }
+                    
+                    JsonDocument doc;
+                    int statusCode;
+                    
+                    if (configManager.saveDisplayRotation(rotation)) {
+                        // Update button helpers rotation
+                        extern uint8_t g_displayRotation;
+                        g_displayRotation = rotation;
+                        
+                        // Apply rotation immediately
+                        extern DisplayManager displayManager;
+                        displayManager.applyRotation();
+                        
+                        doc["success"] = true;
+                        doc["message"] = "Display rotation updated successfully!";
+                        doc["rotation"] = rotation;
+                        statusCode = 200;
+                        LOG_INFO("WebServer", "🚇 TUNNELED display rotation=" + String(rotation));
+                    } else {
+                        doc["success"] = false;
+                        doc["message"] = "Failed to save display rotation!";
+                        statusCode = 500;
+                        LOG_ERROR("WebServer", "🚇 TUNNELED Failed to save display rotation");
+                    }
+                    
+                    String response;
+                    serializeJson(doc, response);
+                    
+                    LOG_INFO("WebServer", "🔐 DISPLAY_ROTATION POST ENCRYPTION: Securing tunneled response [TUNNELED]");
+                    WebServerSecureIntegration::sendSecureResponse(request, statusCode, "application/json", response, secureLayer);
+                    return;
+                }
+                
                 // 🎯 МАРШРУТИЗАЦИЯ: /api/pincode_settings GET
                 if (targetEndpoint == "/api/pincode_settings" && targetMethod == "GET") {
                     if (request->hasHeader("X-User-Activity")) {
@@ -6160,8 +6459,17 @@ void WebServerManager::start() {
                     doc["length"] = pinManager.getPinLength();
                     
                     // Device BLE PIN status
-                    doc["deviceBlePinEnabled"] = deviceBlePinEnabled;
+                    doc["deviceBlePinEnabled"]   = deviceBlePinEnabled;
                     doc["deviceBlePinConfigured"] = deviceBlePinConfigured;
+                    doc["duressPinEnabled"]      = CryptoManager::getInstance().isDuressPinEnabled();
+                    doc["duressPinConfigured"]   = CryptoManager::getInstance().isDuressPinConfigured();
+                    
+                    // Board capabilities
+#ifdef BOARD_HAS_USB_HID
+                    doc["has_usb_hid"] = true;
+#else
+                    doc["has_usb_hid"] = false;
+#endif
                     
                     // Legacy fields для обратной совместимости
                     doc["enabled"] = pinProtectionEnabled;
@@ -6250,6 +6558,8 @@ void WebServerManager::start() {
                                 LittleFS.remove(LOGIN_STATE_FILE);
                                 LittleFS.remove("/rtc_config.json");
                                 LittleFS.remove("/ble_pin.json.enc");
+                                LittleFS.remove("/device_ble_pin.json.enc");
+                                LittleFS.remove("/duress_pin.hash");
                                 LittleFS.remove("/session.json.enc");
                                 
                                 // URL Obfuscation: Удаление boot counter и всех mappings
@@ -6342,64 +6652,20 @@ void WebServerManager::start() {
                     LOG_DEBUG("WebServer", "🚇 [TUNNELED] targetData JSON: " + targetDataDebug);
                     
                     // Новая логика: поддержка двух типов PIN
-                    String bleBondingPinStr = targetData["ble_bonding_pin"].as<String>();
                     String deviceBlePinStr = targetData["device_ble_pin"].as<String>();
                     String deviceBlePinEnabledStr = targetData["device_ble_pin_enabled"].as<String>();
                     bool deviceBlePinEnabled = (deviceBlePinEnabledStr == "true");
                     bool deviceBlePinEnabledProvided = (deviceBlePinEnabledStr.length() > 0 && deviceBlePinEnabledStr != "null"); // Параметр был передан
                     
                     // Проверка на null/пустые значения
-                    bool hasBondingPin = (bleBondingPinStr.length() > 0 && bleBondingPinStr != "null");
                     bool hasDevicePin = (deviceBlePinStr.length() > 0 && deviceBlePinStr != "null");
                     
-                    LOG_INFO("WebServer", "🚇 TUNNELED BLE PIN update: bonding=" + String(hasBondingPin) + ", device=" + String(hasDevicePin));
+                    LOG_INFO("WebServer", "🚇 TUNNELED BLE PIN update: device=" + String(hasDevicePin));
                     LOG_DEBUG("WebServer", "🚇 PIN values protected in logs");
                     
                     String message;
                     int statusCode = 200;
                     bool success = true;
-                    
-                    // Обработка BLE Bonding PIN
-                    if (hasBondingPin) {
-                        if (bleBondingPinStr.length() != 6) {
-                            message = "BLE Bonding PIN must be exactly 6 digits";
-                            statusCode = 400;
-                            success = false;
-                        } else {
-                            bool validDigits = true;
-                            for (char c : bleBondingPinStr) {
-                                if (!isdigit(c)) {
-                                    validDigits = false;
-                                    break;
-                                }
-                            }
-                            
-                            if (!validDigits) {
-                                message = "BLE Bonding PIN must contain only digits";
-                                statusCode = 400;
-                                success = false;
-                            } else {
-                                uint32_t blePin = bleBondingPinStr.toInt();
-                                
-                                if (CryptoManager::getInstance().saveBlePin(blePin)) {
-                                    LOG_INFO("WebServer", "🚇 TUNNELED BLE Bonding PIN updated successfully");
-                                    
-                                    // Clear all BLE bonding keys when PIN changes for security
-                                    if (bleKeyboardManager) {
-                                        bleKeyboardManager->clearBondingKeys();
-                                        LOG_INFO("WebServer", "🚇 TUNNELED BLE bonding keys cleared");
-                                    }
-                                    
-                                    message = "BLE Bonding PIN updated successfully! All BLE clients cleared.";
-                                } else {
-                                    LOG_ERROR("WebServer", "🚇 TUNNELED Failed to save BLE Bonding PIN");
-                                    message = "Failed to save BLE Bonding PIN";
-                                    statusCode = 500;
-                                    success = false;
-                                }
-                            }
-                        }
-                    }
                     
                     // Обработка Device BLE PIN
                     if (success && hasDevicePin) {
@@ -6431,12 +6697,7 @@ void WebServerManager::start() {
                                 
                                 if (CryptoManager::getInstance().saveDeviceBlePin(devicePin)) {
                                     LOG_INFO("WebServer", "🚇 TUNNELED Device BLE PIN updated successfully");
-                                    
-                                    if (hasBondingPin) {
-                                        message += " Device BLE PIN also updated.";
-                                    } else {
-                                        message = "Device BLE PIN updated successfully!";
-                                    }
+                                    message = "Device BLE PIN updated successfully!";
                                 } else {
                                     LOG_ERROR("WebServer", "🚇 TUNNELED Failed to save Device BLE PIN");
                                     message = "Failed to save Device BLE PIN";
@@ -6459,7 +6720,7 @@ void WebServerManager::start() {
                         }
                     }
                     
-                    if (!hasBondingPin && !hasDevicePin) {
+                    if (!hasDevicePin) {
                         message = "No PIN parameters provided";
                         statusCode = 400;
                         success = false;
@@ -6472,6 +6733,31 @@ void WebServerManager::start() {
                     serializeJson(doc, response);
                     
                     LOG_INFO("WebServer", "🔐 BLE_PIN_UPDATE POST ENCRYPTION: Securing tunneled response, success=" + String(success));
+                    WebServerSecureIntegration::sendSecureResponse(request, statusCode, "application/json", response, secureLayer);
+                    return;
+                }
+
+                if (targetEndpoint == "/api/duress_pin_update" && targetMethod == "POST") {
+                    String dpStr   = targetData["duress_pin"].as<String>();
+                    String dpEnStr = targetData["duress_pin_enabled"].as<String>();
+                    bool dpEnabled = (dpEnStr == "true");
+                    bool dpEnProv  = (dpEnStr.length() > 0 && dpEnStr != "null");
+                    bool hasDP     = (dpStr.length() > 0 && dpStr != "null");
+                    LOG_INFO("WebServer", "🚇 TUNNELED Duress PIN update: hasDP=" + String(hasDP));
+                    bool success = true; int statusCode = 200; String message = "";
+                    if (hasDP) {
+                        int expected = pinManager.getPinLength();
+                        bool allDigits = ((int)dpStr.length() == expected);
+                        for (char c : dpStr) { if (!isdigit(c)) { allDigits = false; break; } }
+                        if (!allDigits) { message = "Duress PIN must be " + String(expected) + " digits"; statusCode = 400; success = false; }
+                        else if (CryptoManager::getInstance().saveDuressPin(dpStr)) { message = "Duress PIN saved successfully!"; }
+                        else { message = "Failed to save Duress PIN"; statusCode = 500; success = false; }
+                    } else if (!hasDP && dpEnProv && !dpEnabled) {
+                        if (CryptoManager::getInstance().isDuressPinConfigured()) { CryptoManager::getInstance().setDuressPinEnabled(false); message = "Duress PIN disabled successfully!"; }
+                        else { message = "Duress PIN not configured"; statusCode = 400; success = false; }
+                    } else { message = "No Duress PIN parameters provided"; statusCode = 400; success = false; }
+                    JsonDocument doc; doc["success"] = success; doc["message"] = message;
+                    String response; serializeJson(doc, response);
                     WebServerSecureIntegration::sendSecureResponse(request, statusCode, "application/json", response, secureLayer);
                     return;
                 }
@@ -7236,8 +7522,17 @@ void WebServerManager::start() {
                         doc["length"] = pinManager.getPinLength();
                         
                         // Device BLE PIN status
-                        doc["deviceBlePinEnabled"] = deviceBlePinEnabled;
+                        doc["deviceBlePinEnabled"]   = deviceBlePinEnabled;
                         doc["deviceBlePinConfigured"] = deviceBlePinConfigured;
+                        doc["duressPinEnabled"]      = CryptoManager::getInstance().isDuressPinEnabled();
+                        doc["duressPinConfigured"]   = CryptoManager::getInstance().isDuressPinConfigured();
+                        
+                        // Board capabilities
+#ifdef BOARD_HAS_USB_HID
+                        doc["has_usb_hid"] = true;
+#else
+                        doc["has_usb_hid"] = false;
+#endif
                         
                         // Legacy fields для обратной совместимости
                         doc["enabled"] = pinProtectionEnabled;
@@ -7344,12 +7639,15 @@ void WebServerManager::start() {
                         if (request->hasHeader("X-User-Activity")) resetActivityTimer();
                         uint16_t displayTimeout = configManager.getDisplayTimeout();
                         uint32_t autoLockTimeout = configManager.getAutoLockTimeout();
+                        uint16_t dimTimeout = configManager.getDimTimeout();
                         String output;
-                        output.reserve(60);
+                        output.reserve(80);
                         output = "{\"display_timeout\":";
                         output += String(displayTimeout);
                         output += ",\"auto_lock_timeout\":";
                         output += String(autoLockTimeout);
+                        output += ",\"dim_timeout\":";
+                        output += String(dimTimeout);
                         output += "}";
                         WebServerSecureIntegration::sendSecureResponse(request, 200, "application/json", output, secureLayer);
                         if (bufferPtr) { delete bufferPtr; request->_tempObject = nullptr; }
@@ -7885,6 +8183,32 @@ void WebServerManager::start() {
                             return;
                         }
                         
+                        String dimTimeoutStr = targetData["dim_timeout"].as<String>();
+                        uint16_t dimTimeout = (dimTimeoutStr.length() > 0 && dimTimeoutStr != "null") ? (uint16_t)dimTimeoutStr.toInt() : configManager.getDimTimeout();
+                        
+                        if (dimTimeout != 0 && dimTimeout != 5 && dimTimeout != 10 && dimTimeout != 15 &&
+                            dimTimeout != 30 && dimTimeout != 60 && dimTimeout != 300) {
+                            JsonDocument errorDoc;
+                            errorDoc["success"] = false;
+                            errorDoc["message"] = "Invalid dim timeout value!";
+                            String errorResponse;
+                            serializeJson(errorDoc, errorResponse);
+                            WebServerSecureIntegration::sendSecureResponse(request, 400, "application/json", errorResponse, secureLayer);
+                            if (bufferPtr) { delete bufferPtr; request->_tempObject = nullptr; }
+                            return;
+                        }
+                        
+                        if (dimTimeout > 0 && timeout > 0 && dimTimeout >= timeout) {
+                            JsonDocument errorDoc;
+                            errorDoc["success"] = false;
+                            errorDoc["message"] = "Dim timeout must be less than screen timeout!";
+                            String errorResponse;
+                            serializeJson(errorDoc, errorResponse);
+                            WebServerSecureIntegration::sendSecureResponse(request, 400, "application/json", errorResponse, secureLayer);
+                            if (bufferPtr) { delete bufferPtr; request->_tempObject = nullptr; }
+                            return;
+                        }
+                        
                         if (timeout > 0 && autoLockTimeout > 0 && autoLockTimeout <= timeout) {
                             JsonDocument errorDoc;
                             errorDoc["success"] = false;
@@ -7896,16 +8220,28 @@ void WebServerManager::start() {
                             return;
                         }
                         
+                        if (dimTimeout > 0 && autoLockTimeout > 0 && dimTimeout >= autoLockTimeout) {
+                            JsonDocument errorDoc;
+                            errorDoc["success"] = false;
+                            errorDoc["message"] = "Dim timeout must be less than auto lock timeout!";
+                            String errorResponse;
+                            serializeJson(errorDoc, errorResponse);
+                            WebServerSecureIntegration::sendSecureResponse(request, 400, "application/json", errorResponse, secureLayer);
+                            if (bufferPtr) { delete bufferPtr; request->_tempObject = nullptr; }
+                            return;
+                        }
+                        
                         JsonDocument doc;
                         int statusCode;
                         
-                        if (configManager.saveDisplayTimeout(timeout) && configManager.saveAutoLockTimeout(autoLockTimeout)) {
+                        if (configManager.saveDisplayTimeout(timeout) && configManager.saveAutoLockTimeout(autoLockTimeout) && configManager.saveDimTimeout(dimTimeout)) {
                             doc["success"] = true;
                             doc["message"] = "Display settings saved successfully!";
                             doc["timeout"] = timeout;
                             doc["auto_lock_timeout"] = autoLockTimeout;
+                            doc["dim_timeout"] = dimTimeout;
                             statusCode = 200;
-                            LOG_INFO("WebServer", "🔗 Obfuscated display timeout=" + String(timeout) + "s autoLock=" + String(autoLockTimeout) + "s");
+                            LOG_INFO("WebServer", "🔗 Obfuscated display timeout=" + String(timeout) + "s autoLock=" + String(autoLockTimeout) + "s dim=" + String(dimTimeout) + "s");
                         } else {
                             doc["success"] = false;
                             doc["message"] = "Failed to save display settings!";
@@ -7917,6 +8253,87 @@ void WebServerManager::start() {
                         serializeJson(doc, response);
                         
                         LOG_INFO("WebServer", "🔐 OBFUSCATED DISPLAY_SETTINGS: Securing response");
+                        WebServerSecureIntegration::sendSecureResponse(request, statusCode, "application/json", response, secureLayer);
+                        if (bufferPtr) { delete bufferPtr; request->_tempObject = nullptr; }
+                        return;
+                    }
+                    
+                    // /api/display/rotation GET
+                    if (targetEndpoint == "/api/display/rotation" && targetMethod == "GET") {
+                        if (request->hasHeader("X-User-Activity")) resetActivityTimer();
+                        
+                        uint8_t rotation = configManager.getDisplayRotation();
+                        String output;
+                        output.reserve(20);
+                        output = "{\"rotation\":";
+                        output += String(rotation);
+                        output += "}";
+                        
+                        WebServerSecureIntegration::sendSecureResponse(request, 200, "application/json", output, secureLayer);
+                        if (bufferPtr) { delete bufferPtr; request->_tempObject = nullptr; }
+                        return;
+                    }
+                    
+                    // /api/display/rotation POST
+                    if (targetEndpoint == "/api/display/rotation" && targetMethod == "POST") {
+                        if (request->hasHeader("X-User-Activity")) {
+                            resetActivityTimer();
+                        }
+                        
+                        String rotationStr = targetData["rotation"].as<String>();
+                        
+                        if (rotationStr.length() == 0) {
+                            JsonDocument errorDoc;
+                            errorDoc["success"] = false;
+                            errorDoc["message"] = "Missing rotation parameter!";
+                            String errorResponse;
+                            serializeJson(errorDoc, errorResponse);
+                            WebServerSecureIntegration::sendSecureResponse(request, 400, "application/json", errorResponse, secureLayer);
+                            if (bufferPtr) { delete bufferPtr; request->_tempObject = nullptr; }
+                            return;
+                        }
+                        
+                        uint8_t rotation = rotationStr.toInt();
+                        
+                        if (rotation > 3) {
+                            JsonDocument errorDoc;
+                            errorDoc["success"] = false;
+                            errorDoc["message"] = "Invalid rotation value! Must be 0-3.";
+                            String errorResponse;
+                            serializeJson(errorDoc, errorResponse);
+                            WebServerSecureIntegration::sendSecureResponse(request, 400, "application/json", errorResponse, secureLayer);
+                            if (bufferPtr) { delete bufferPtr; request->_tempObject = nullptr; }
+                            return;
+                        }
+                        
+                        JsonDocument doc;
+                        int statusCode;
+                        
+                        if (configManager.saveDisplayRotation(rotation)) {
+                            // Update button helpers rotation
+                            extern uint8_t g_displayRotation;
+                            g_displayRotation = rotation;
+                            
+                            // Apply rotation immediately
+                            extern DisplayManager displayManager;
+                            displayManager.applyRotation();
+                            
+                            doc["success"] = true;
+                            doc["message"] = "Display rotation updated successfully!";
+                            doc["rotation"] = rotation;
+                            statusCode = 200;
+                            LOG_INFO("WebServer", "🔗 Obfuscated display rotation=" + String(rotation));
+                        } else {
+                            doc["success"] = false;
+                            doc["message"] = "Failed to save display rotation!";
+                            statusCode = 500;
+                            LOG_ERROR("WebServer", "🔗 Obfuscated Failed to save display rotation");
+                        }
+                        
+                        String response;
+                        serializeJson(doc, response);
+                        
+                        LOG_INFO("WebServer", "🔐 OBFUSCATED DISPLAY_ROTATION: Securing response");
                         WebServerSecureIntegration::sendSecureResponse(request, statusCode, "application/json", response, secureLayer);
                         if (bufferPtr) { delete bufferPtr; request->_tempObject = nullptr; }
                         return;
@@ -8011,6 +8428,8 @@ void WebServerManager::start() {
                                         LittleFS.remove(LOGIN_STATE_FILE);
                                         LittleFS.remove("/rtc_config.json");
                                         LittleFS.remove("/ble_pin.json.enc");
+                                        LittleFS.remove("/device_ble_pin.json.enc");
+                                        LittleFS.remove("/duress_pin.hash");
                                         LittleFS.remove("/session.json.enc");
                                         
                                         // URL Obfuscation: Удаление boot counter и всех mappings
@@ -8102,63 +8521,19 @@ void WebServerManager::start() {
                         LOG_DEBUG("WebServer", "🔗 [OBFUSCATED] targetData JSON: " + targetDataDebug);
                         
                         // Новая логика: поддержка двух типов PIN
-                        String bleBondingPinStr = targetData["ble_bonding_pin"].as<String>();
                         String deviceBlePinStr = targetData["device_ble_pin"].as<String>();
                         String deviceBlePinEnabledStr = targetData["device_ble_pin_enabled"].as<String>();
                         bool deviceBlePinEnabled = (deviceBlePinEnabledStr == "true");
                         bool deviceBlePinEnabledProvided = (deviceBlePinEnabledStr.length() > 0 && deviceBlePinEnabledStr != "null"); // Параметр был передан
                         
                         // Проверка на null/пустые значения
-                        bool hasBondingPin = (bleBondingPinStr.length() > 0 && bleBondingPinStr != "null");
                         bool hasDevicePin = (deviceBlePinStr.length() > 0 && deviceBlePinStr != "null");
                         
-                        LOG_INFO("WebServer", "🔗 [OBFUSCATED] BLE PIN UPDATE: hasBondingPin=" + String(hasBondingPin) + ", hasDevicePin=" + String(hasDevicePin));
+                        LOG_INFO("WebServer", "🔗 [OBFUSCATED] BLE PIN UPDATE: hasDevicePin=" + String(hasDevicePin));
                         
                         String message;
                         int statusCode = 200;
                         bool success = true;
-                        
-                        // Обработка BLE Bonding PIN
-                        if (hasBondingPin) {
-                            if (bleBondingPinStr.length() != 6) {
-                                message = "BLE Bonding PIN must be exactly 6 digits";
-                                statusCode = 400;
-                                success = false;
-                            } else {
-                                bool validDigits = true;
-                                for (char c : bleBondingPinStr) {
-                                    if (!isdigit(c)) {
-                                        validDigits = false;
-                                        break;
-                                    }
-                                }
-                                
-                                if (!validDigits) {
-                                    message = "BLE Bonding PIN must contain only digits";
-                                    statusCode = 400;
-                                    success = false;
-                                } else {
-                                    uint32_t blePin = bleBondingPinStr.toInt();
-                                    
-                                    if (CryptoManager::getInstance().saveBlePin(blePin)) {
-                                        LOG_INFO("WebServer", "🔗 Obfuscated BLE Bonding PIN updated successfully");
-                                        
-                                        // Clear all BLE bonding keys when PIN changes for security
-                                        if (bleKeyboardManager) {
-                                            bleKeyboardManager->clearBondingKeys();
-                                            LOG_INFO("WebServer", "🔗 Obfuscated BLE bonding keys cleared");
-                                        }
-                                        
-                                        message = "BLE Bonding PIN updated successfully! All BLE clients cleared.";
-                                    } else {
-                                        LOG_ERROR("WebServer", "🔗 Obfuscated Failed to save BLE Bonding PIN");
-                                        message = "Failed to save BLE Bonding PIN";
-                                        statusCode = 500;
-                                        success = false;
-                                    }
-                                }
-                            }
-                        }
                         
                         // Обработка Device BLE PIN
                         if (success && hasDevicePin) {
@@ -8190,12 +8565,7 @@ void WebServerManager::start() {
                                     
                                     if (CryptoManager::getInstance().saveDeviceBlePin(devicePin)) {
                                         LOG_INFO("WebServer", "🔗 Obfuscated Device BLE PIN updated successfully");
-                                        
-                                        if (hasBondingPin) {
-                                            message += " Device BLE PIN also updated.";
-                                        } else {
-                                            message = "Device BLE PIN updated successfully!";
-                                        }
+                                        message = "Device BLE PIN updated successfully!";
                                     } else {
                                         LOG_ERROR("WebServer", "🔗 Obfuscated Failed to save Device BLE PIN");
                                         message = "Failed to save Device BLE PIN";
@@ -8218,7 +8588,7 @@ void WebServerManager::start() {
                             }
                         }
                         
-                        if (!hasBondingPin && !hasDevicePin) {
+                        if (!hasDevicePin) {
                             message = "No PIN parameters provided";
                             statusCode = 400;
                             success = false;
@@ -8231,6 +8601,32 @@ void WebServerManager::start() {
                         serializeJson(doc, response);
                         
                         LOG_INFO("WebServer", "🔐 OBFUSCATED BLE_PIN_UPDATE: Securing response, success=" + String(success));
+                        WebServerSecureIntegration::sendSecureResponse(request, statusCode, "application/json", response, secureLayer);
+                        if (bufferPtr) { delete bufferPtr; request->_tempObject = nullptr; }
+                        return;
+                    }
+
+                    if (targetEndpoint == "/api/duress_pin_update" && targetMethod == "POST") {
+                        String dpStr   = targetData["duress_pin"].as<String>();
+                        String dpEnStr = targetData["duress_pin_enabled"].as<String>();
+                        bool dpEnabled = (dpEnStr == "true");
+                        bool dpEnProv  = (dpEnStr.length() > 0 && dpEnStr != "null");
+                        bool hasDP     = (dpStr.length() > 0 && dpStr != "null");
+                        LOG_INFO("WebServer", "🔗 [OBFUSCATED] Duress PIN update: hasDP=" + String(hasDP));
+                        bool success = true; int statusCode = 200; String message = "";
+                        if (hasDP) {
+                            int expected = pinManager.getPinLength();
+                            bool allDigits = ((int)dpStr.length() == expected);
+                            for (char c : dpStr) { if (!isdigit(c)) { allDigits = false; break; } }
+                            if (!allDigits) { message = "Duress PIN must be " + String(expected) + " digits"; statusCode = 400; success = false; }
+                            else if (CryptoManager::getInstance().saveDuressPin(dpStr)) { message = "Duress PIN saved successfully!"; }
+                            else { message = "Failed to save Duress PIN"; statusCode = 500; success = false; }
+                        } else if (!hasDP && dpEnProv && !dpEnabled) {
+                            if (CryptoManager::getInstance().isDuressPinConfigured()) { CryptoManager::getInstance().setDuressPinEnabled(false); message = "Duress PIN disabled successfully!"; }
+                            else { message = "Duress PIN not configured"; statusCode = 400; success = false; }
+                        } else { message = "No Duress PIN parameters provided"; statusCode = 400; success = false; }
+                        JsonDocument doc; doc["success"] = success; doc["message"] = message;
+                        String response; serializeJson(doc, response);
                         WebServerSecureIntegration::sendSecureResponse(request, statusCode, "application/json", response, secureLayer);
                         if (bufferPtr) { delete bufferPtr; request->_tempObject = nullptr; }
                         return;
@@ -8367,6 +8763,9 @@ void WebServerManager::start() {
                             JsonObject obj = array.add<JsonObject>();
                             obj["name"] = entry.name;
                             obj["password"] = entry.password;
+                            obj["strength"] = entry.strength;
+                            obj["pw_hash"] = entry.pw_hash;
+                            obj["category"] = entry.category;
                         }
                         String output;
                         serializeJson(doc, output);
@@ -8385,10 +8784,11 @@ void WebServerManager::start() {
                         
                         String name = targetData["name"].as<String>();
                         String password = targetData["password"].as<String>();
+                        String category = targetData["category"] | "";
                         
                         LOG_INFO("WebServer", "🔗 Obfuscated Password add: " + name);
                         
-                        if (passwordManager.addPassword(name, password)) {
+                        if (passwordManager.addPassword(name, password, category)) {
                             LOG_INFO("WebServer", "🔗 Obfuscated Password added: " + name);
                             
                             JsonDocument responseDoc;
@@ -8467,6 +8867,7 @@ void WebServerManager::start() {
                             JsonDocument responseDoc;
                             responseDoc["name"] = pwd.name;
                             responseDoc["password"] = pwd.password;
+                            responseDoc["category"] = pwd.category;
                             String jsonResponse;
                             serializeJson(responseDoc, jsonResponse);
                             
@@ -8496,10 +8897,11 @@ void WebServerManager::start() {
                         int index = targetData["index"].as<int>();
                         String name = targetData["name"].as<String>();
                         String password = targetData["password"].as<String>();
+                        String category = targetData["category"] | "";
                         
                         LOG_INFO("WebServer", "🔗 Obfuscated Password update: index " + String(index) + ", name: " + name);
                         
-                        if (passwordManager.updatePassword(index, name, password)) {
+                        if (passwordManager.updatePassword(index, name, password, category)) {
                             LOG_INFO("WebServer", "🔗 Obfuscated Password updated at index: " + String(index));
                             
                             JsonDocument responseDoc;
@@ -8599,6 +9001,9 @@ void WebServerManager::start() {
                                 JsonObject obj = array.add<JsonObject>();
                                 obj["name"] = entry.name;
                                 obj["password"] = entry.password;
+                                obj["strength"] = entry.strength;
+                                obj["pw_hash"] = entry.pw_hash;
+                                obj["category"] = entry.category;
                             }
                             serializeJson(doc, plaintext);
                             // JsonDocument автоматически освобождается здесь
@@ -9049,6 +9454,10 @@ void WebServerManager::startConfigServer() {
     
     server.on("/", HTTP_GET, [this](AsyncWebServerRequest *request){
         String html = wifi_setup_html;
+        if (!html.length()) {
+            request->send(503, "text/plain", "Out of memory");
+            return;
+        }
         // Вставляем mDNS имя хоста по умолчанию в HTML для редиректа
         html.replace("##MDNS_HOSTNAME##", DEFAULT_MDNS_HOSTNAME);
         request->send(200, "text/html", html);
@@ -9062,27 +9471,41 @@ void WebServerManager::startConfigServer() {
         }
         if (n == WIFI_SCAN_FAILED || n == 0) {
             unsigned long now = millis();
-            if (now - lastConfigScanStart > 5000) {
+            uint32_t freeHeap = ESP.getFreeHeap();
+            if (now - lastConfigScanStart > 8000 && freeHeap > 60000) {
                 lastConfigScanStart = now;
+                if (WiFi.getMode() != WIFI_AP_STA) WiFi.mode(WIFI_AP_STA);
                 WiFi.scanNetworks(true);
+                LOG_INFO("WebServer", "Config portal scan started, heap=" + String(freeHeap));
             }
             request->send(200, "application/json", "[]");
             return;
         }
-        StaticJsonDocument<2048> doc;
+        // Classic ESP32 has no PSRAM — limit results to protect heap
+        #ifdef BOARD_HAS_PSRAM
+            int limit = min(n, 15);
+        #else
+            int limit = min(n, 8);
+        #endif
+        
+        DynamicJsonDocument doc(512 + limit * 80); // heap alloc, not stack
         JsonArray array = doc.to<JsonArray>();
-        int limit = min(n, 15);
         for (int i = 0; i < limit; ++i) {
-            JsonObject net = array.add<JsonObject>();
+            JsonObject net = array.createNestedObject();
             net["ssid"] = WiFi.SSID(i);
             net["rssi"] = WiFi.RSSI(i);
         }
         WiFi.scanDelete();
+        
+        // Only start new scan if enough heap available
         unsigned long now = millis();
-        if (now - lastConfigScanStart > 5000) {
+        uint32_t freeHeap = ESP.getFreeHeap();
+        if (now - lastConfigScanStart > 8000 && freeHeap > 60000) {
             lastConfigScanStart = now;
+            if (WiFi.getMode() != WIFI_AP_STA) WiFi.mode(WIFI_AP_STA);
             WiFi.scanNetworks(true);
         }
+        
         String output;
         serializeJson(doc, output);
         request->send(200, "application/json", output);

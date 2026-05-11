@@ -13,6 +13,7 @@
 - `LOGGING_SYSTEM.md` — Log levels, LOG_* macros, Serial output format, filtering.
 - `url-obfuscation.md` — URL obfuscation layer internals, epoch rotation, endpoint registration checklist.
 - `multi-board.md` — Multi-board development rules. Three types of platform differences, scaling checklist, golden rule.
+- `PORTING.md` — Hardware porting guide. Step-by-step instructions for adapting SecureGen firmware to new ESP32/S3 boards. Covers hardware requirements, board header creation, platformio.ini configuration, capability flags (USB HID, PSRAM), deep sleep wake pins, display geometry, security checklist, and common mistakes to avoid.
 
 #### development/boards/
 Hardware reference for supported targets. Each file covers: MCU, display, pinout, USB/flashing specifics, known quirks.

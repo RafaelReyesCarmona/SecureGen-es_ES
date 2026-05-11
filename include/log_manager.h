@@ -21,7 +21,7 @@ struct LogEntry {
 };
 
 #ifndef LOG_LEVEL
-#define LOG_LEVEL 3  // 0=DEBUG 1=INFO 2=WARNING 3=ERROR 4=CRITICAL
+#define LOG_LEVEL 0  // 0=DEBUG 1=INFO 2=WARNING 3=ERROR 4=CRITICAL
 #endif
 
 class LogManager {

@@ -8,6 +8,7 @@
 UsbHidManager usbHidManager;
 #endif
 #include "board_config.h"
+#include "button_helpers.h"
 #include "config.h"
 #include "config_manager.h"
 #include "crypto_manager.h"
@@ -28,6 +29,7 @@ UsbHidManager usbHidManager;
 #include <esp_gap_ble_api.h>
 #include <esp_task_wdt.h>
 #include <nvs_flash.h>
+#include <esp_partition.h>
 
 #ifdef SECURE_LAYER_ENABLED
 #include "secure_layer_manager.h"
@@ -44,6 +46,9 @@ bool shouldPromptPinDisable = false;
 // Pending theme change (set by web server, applied in main loop to avoid watchdog)
 bool pendingThemeChange = false;
 Theme pendingTheme = Theme::LIGHT;
+
+// Global display rotation (loaded once at startup for button helpers)
+uint8_t g_displayRotation = 1;
 
 #define WDT_TIMEOUT 10
 
@@ -80,6 +85,60 @@ TrafficObfuscationManager &trafficObfuscationManager =
 #endif
 
 // Secure shutdown function - wipes sensitive data before deep sleep
+void performDuressWipe() {
+    LOG_CRITICAL("Main", "DURESS WIPE: Initiating");
+    CryptoManager::getInstance().wipeDeviceKey();
+    keyManager.wipeSecrets();
+    passwordManager.wipePasswords();
+    secureLayerManager.wipeAllSessions();
+    webServerManager.clearSession();
+    const char* files[] = {
+        "/keys.json.enc", "/passwords.json.enc", "/wifi_config.json",
+        "/wifi_config.json.enc", "/splash_config.json", "/pin_config.json",
+        "/config.json", "/device.key", "/ble_config.json", "/.webadmin",
+        "/mdns_config.json", "/.login_state", "/rtc_config.json",
+        "/ble_pin.json.enc", "/device_ble_pin.json.enc", "/session.json.enc",
+        "/duress_pin.hash", "/boot_counter.txt", "/.pin_attempts", nullptr
+    };
+    for (int i = 0; files[i]; i++) LittleFS.remove(files[i]);
+    fs::File root = LittleFS.open("/", "r");
+    if (root) {
+        fs::File file = root.openNextFile();
+        while (file) {
+            String name = String("/") + file.name(); file.close();
+            if (name.startsWith("/url_mappings_")) LittleFS.remove(name);
+            file = root.openNextFile();
+        }
+        root.close();
+    }
+    // 3. Unmount and erase entire LittleFS partition (forensic-grade wipe)
+    // Partition label "spiffs" is the LittleFS data partition (~3.9 MB)
+    LittleFS.end();
+    const esp_partition_t* lfs_part = esp_partition_find_first(
+        ESP_PARTITION_TYPE_DATA,
+        ESP_PARTITION_SUBTYPE_DATA_SPIFFS,
+        "spiffs");
+    if (lfs_part) {
+        esp_partition_erase_range(lfs_part, 0, lfs_part->size);
+        // Explicit format — LittleFS.begin(format_if_failed) does not handle
+        // LFS_ERR_CORRUPT (-84) on erased partitions in all esp_littlefs versions
+        LittleFS.format();
+    }
+
+    // 4. Erase NVS partition (BLE bonding keys)
+    nvs_flash_erase_partition("nvs");
+    nvs_flash_init_partition("nvs");
+    LOG_CRITICAL("Main", "DURESS WIPE: Complete. Restarting.");
+    delay(500);
+    ESP.restart();
+}
+
+void panicShutdown() {
+  CryptoManager::getInstance().wipeDeviceKey();
+  keyManager.wipeSecrets();
+  passwordManager.wipePasswords();
+}
+
 void secureShutdown() {
   LOG_INFO("Main", "Secure shutdown: wiping sensitive data...");
   CryptoManager::getInstance().wipeDeviceKey();
@@ -101,6 +160,11 @@ int loadPinAttempts() {
     return 0;
   int count = f.parseInt();
   f.close();
+  const int maxAttempts = 5;
+  if (count < 0 || count > maxAttempts) {
+    LOG_ERROR("Main", "Invalid PIN attempts value: " + String(count) + " — locking device");
+    return maxAttempts;
+  }
   return count;
 }
 
@@ -127,6 +191,8 @@ const int factoryResetHoldTime = 5000;
 const int powerOffHoldTime = 5000;
 unsigned long lastActivityTime = 0;
 bool isScreenOn = true;
+bool isDimmed = false;
+static const uint8_t DIM_BRIGHTNESS = 51; // 20% of 255
 
 unsigned long bothButtonsPressStartTime = 0;
 bool bleActionTriggered = false;
@@ -212,7 +278,7 @@ void handleFactoryResetOnBoot() {
 
   unsigned long startTime = millis();
 
-  while (digitalRead(BUTTON_1) == LOW && digitalRead(BUTTON_2) == LOW) {
+  while (readBtn1() && readBtn2()) {
     unsigned long holdTime = millis() - startTime;
 
     if (holdTime > factoryResetHoldTime) {
@@ -241,6 +307,8 @@ void handleFactoryResetOnBoot() {
       LittleFS.remove(LOGIN_STATE_FILE);    // <-- СБРОС СОСТОЯНИЯ ЛОГИНА
       LittleFS.remove("/rtc_config.json");
       LittleFS.remove("/ble_pin.json.enc"); // <-- СБРОС BLE PIN
+      LittleFS.remove("/device_ble_pin.json.enc"); // <-- СБРОС Device BLE PIN
+      LittleFS.remove("/duress_pin.hash"); // <-- СБРОС Duress PIN
       LittleFS.remove("/session.json.enc"); // <-- СБРОС СЕССИЙ И CSRF
 
       // 🔗 URL Obfuscation: Удаление boot counter и всех mappings
@@ -288,6 +356,7 @@ void handleFactoryResetOnBoot() {
 }
 
 void setup() {
+  esp_register_shutdown_handler(panicShutdown);
   Serial.begin(115200);
 #ifdef ARDUINO_USB_CDC_ON_BOOT
   // S3 native USB: don't block boot if no USB host connected
@@ -299,7 +368,7 @@ void setup() {
   pinMode(BUTTON_1, INPUT_PULLUP);
   pinMode(BUTTON_2, INPUT_PULLUP);
 
-  if (digitalRead(BUTTON_1) == LOW && digitalRead(BUTTON_2) == LOW) {
+  if (readBtn1() && readBtn2()) {
     if (LittleFS.begin(true)) {
       Theme savedTheme = configManager.loadTheme();
       displayManager.setTheme(savedTheme);
@@ -316,14 +385,24 @@ void setup() {
   LOG_INFO("Main", "Initializing Battery Manager...");
   batteryManager.begin();
   LOG_INFO("Main", "Initializing LittleFS...");
-  if (!LittleFS.begin(true)) {
-    LOG_CRITICAL("Main", "LittleFS Mount Failed!");
-    DisplayManager tempDisplay;
-    tempDisplay.init();
-    tempDisplay.showMessage("LittleFS Failed", 10, 30, true);
-    while (1)
-      ;
+  if (!LittleFS.begin(false)) {
+    // LittleFS.begin(format_if_failed) may not handle LFS_ERR_CORRUPT.
+    // Explicitly format and retry once.
+    LOG_WARNING("Main", "LittleFS mount failed, formatting and retrying...");
+    LittleFS.format();
+    if (!LittleFS.begin(false)) {
+      LOG_CRITICAL("Main", "LittleFS Mount Failed!");
+      DisplayManager tempDisplay;
+      tempDisplay.init();
+      tempDisplay.showMessage("LittleFS Failed", 10, 30, true);
+      while (1)
+        ;
+    }
   }
+
+  LOG_INFO("Main", "Loading display rotation for button helpers...");
+  g_displayRotation = configManager.getDisplayRotation();
+  LOG_INFO("Main", "Display rotation loaded: " + String(g_displayRotation));
 
   LOG_INFO("Main", "Initializing Crypto Manager...");
   CryptoManager::getInstance().begin();
@@ -684,8 +763,8 @@ void setup() {
           displayManager.updateQRTimer(qrSecondsLeft);
         }
 
-        if (digitalRead(BUTTON_1) == LOW || digitalRead(BUTTON_2) == LOW) {
-          while (digitalRead(BUTTON_1) == LOW || digitalRead(BUTTON_2) == LOW) {
+        if (readBtn1() || readBtn2()) {
+          while (readBtn1() || readBtn2()) {
             esp_task_wdt_reset();
             delay(10);
           }
@@ -714,9 +793,9 @@ void setup() {
                         autoY);
       }
 
-      if (digitalRead(BUTTON_1) == LOW) {
+      if (readBtn1()) {
         highlightButton(1);
-        while (digitalRead(BUTTON_1) == LOW) {
+        while (readBtn1()) {
           esp_task_wdt_reset();
           delay(10);
         }
@@ -732,14 +811,20 @@ void setup() {
         continue;
       }
 
-      if (digitalRead(BUTTON_2) == LOW) {
+      if (readBtn2()) {
         highlightButton(2);
-        while (digitalRead(BUTTON_2) == LOW) {
+        while (readBtn2()) {
           esp_task_wdt_reset();
           delay(10);
         }
         delay(30);
         esp_task_wdt_reset();
+        break;
+      }
+
+      // Auto-exit prompt when a client connects to AP
+      if (WiFi.softAPgetStationNum() > 0) {
+        LOG_INFO("Main", "Client connected to AP — skipping prompt");
         break;
       }
 
@@ -753,6 +838,8 @@ void setup() {
     if (displayManager.isQRCodeActive())
       displayManager.hideQRCode();
     displayManager.clearMessageArea(0, 0, 240, 135);
+    displayManager.setKeySwitched(true); // Clear content area after AP prompt
+    previousKeyIndex = -1; // Force TOTP display redraw after AP prompt
 
     // ❗ ПРОПУСКАЕМ WiFi подключение и синхронизацию времени
     // TOTP коды будут показывать "TIME NOT SYNCED"
@@ -1016,8 +1103,9 @@ void handleButtons() {
   static bool suppressNextSinglePress = false;
   bool buttonPressed = false;
 
-  bool button1_is_pressed = (digitalRead(BUTTON_1) == LOW);
-  bool button2_is_pressed = (digitalRead(BUTTON_2) == LOW);
+  // readBtn1() and readBtn2() already handle rotation, so use them directly
+  bool button1_is_pressed = readBtn1();
+  bool button2_is_pressed = readBtn2();
 
   // --- Логика двойного нажатия (высший приоритет) ---
   if (button1_is_pressed && button2_is_pressed) {
@@ -1069,13 +1157,25 @@ void handleButtons() {
             previousPasswordIndex = -1;
 #ifdef BOARD_HAS_USB_HID
             {
-              bool useBle = displayManager.drawHidPrompt(defaultHidIsBle);
-              if (useBle) {
-                currentMode = AppMode::BLE_ADVERTISING;
-                LOG_INFO("Main", "HID prompt: BLE selected");
+              // Check Device BLE PIN before showing HID prompt
+              bool pinOk = true;
+              if (CryptoManager::getInstance().isDeviceBlePinEnabled()) {
+                LOG_INFO("Main", "Device BLE PIN required before HID prompt");
+                pinOk = pinManager.requestDeviceBlePinForTransmission();
+              }
+              if (!pinOk) {
+                LOG_WARNING("Main", "Device BLE PIN failed or cancelled. Aborting HID prompt");
+                bleActionTriggered = false;
+                displayManager.hideLoader();
               } else {
-                currentMode = AppMode::USB_HID_SEND;
-                LOG_INFO("Main", "HID prompt: USB selected");
+                bool useBle = displayManager.drawHidPrompt(defaultHidIsBle);
+                if (useBle) {
+                  currentMode = AppMode::BLE_ADVERTISING;
+                  LOG_INFO("Main", "HID prompt: BLE selected");
+                } else {
+                  currentMode = AppMode::USB_HID_SEND;
+                  LOG_INFO("Main", "HID prompt: USB selected");
+                }
               }
             }
 #else
@@ -1242,6 +1342,11 @@ void handleButtons() {
       LOG_DEBUG("Main", "Button press woke up screen");
       displayManager.turnOn();
       isScreenOn = true;
+      isDimmed = false;
+    } else if (isDimmed) {
+      LOG_DEBUG("Main", "Button press restored brightness from dim");
+      displayManager.setBrightness(255);
+      isDimmed = false;
     }
     previousKeyIndex = -1;
     previousPasswordIndex = -1;
@@ -1253,8 +1358,10 @@ void checkScreenWakeup() {
   static bool button1PreviousState = HIGH;
   static bool button2PreviousState = HIGH;
 
-  bool button1Current = digitalRead(BUTTON_1);
-  bool button2Current = digitalRead(BUTTON_2);
+  // readBtn1/readBtn2 return true when pressed (LOW), false when not pressed (HIGH)
+  // So we need to invert for state comparison
+  bool button1Current = readBtn1() ? LOW : HIGH;
+  bool button2Current = readBtn2() ? LOW : HIGH;
 
   // Проверяем нажатие любой кнопки (переход от HIGH к LOW)
   if ((button1PreviousState == HIGH && button1Current == LOW) ||
@@ -1273,6 +1380,11 @@ void checkScreenWakeup() {
       LOG_DEBUG("Main", "Button press woke up screen in BLE mode");
       displayManager.turnOn();
       isScreenOn = true;
+      isDimmed = false;
+    } else if (isDimmed) {
+      LOG_DEBUG("Main", "Button press restored brightness from dim in BLE mode");
+      displayManager.setBrightness(255);
+      isDimmed = false;
     }
   }
 
@@ -1287,13 +1399,14 @@ void loop() {
     if (!isFirstTimeSetup) {
       static bool button2PreviousState = HIGH;
       static bool retryInProgress = false;
-      bool button2Current = digitalRead(BUTTON_2);
+      // readBtn2() returns true when pressed (LOW), false when not pressed (HIGH)
+      bool button2Current = readBtn2() ? LOW : HIGH;
       
       // Детект нажатия (переход HIGH → LOW)
       if (button2PreviousState == HIGH && button2Current == LOW && !retryInProgress) {
         delay(50);  // Debounce
         
-        if (digitalRead(BUTTON_2) == LOW) {
+        if (readBtn2()) {
           retryInProgress = true;
           LOG_INFO("Main", "BUTTON_2 pressed - retrying WiFi connection (fallback mode)");
           
@@ -1477,7 +1590,7 @@ void loop() {
   // HOTP generation state machine — all heavy work done here in main loop
   if (hotpSavePending) {
     // Wait until both buttons released
-    if (digitalRead(BUTTON_1) == HIGH && digitalRead(BUTTON_2) == HIGH) {
+    if (!readBtn1() && !readBtn2()) {
       delay(50); // stabilization
       esp_task_wdt_reset();
 
@@ -1507,6 +1620,10 @@ void loop() {
   // sleep
   if (webServerManager.isRunning()) {
     lastActivityTime = millis();
+    if (isDimmed) {
+      displayManager.setBrightness(255);
+      isDimmed = false;
+    }
   }
 
   // Independent auto lock timer — only when screen timeout is Never (0)
@@ -1530,14 +1647,27 @@ void loop() {
     esp_deep_sleep_start();
   }
 
-  if (!webServerManager.isRunning() && screenTimeoutSeconds > 0 && isScreenOn &&
+  // Dim check — fires before screen timeout
+  uint16_t dimTimeoutSeconds = configManager.getDimTimeout();
+  bool canApplyIdleEffect = !webServerManager.isRunning() &&
+      isScreenOn &&
       !bleKeyboardManager.isConnected() &&
       currentMode != AppMode::BLE_ADVERTISING &&
       currentMode != AppMode::BLE_PIN_ENTRY &&
 #ifdef BOARD_HAS_USB_HID
       !usbHidManager.isConnected() &&
 #endif
-      (millis() - lastActivityTime > (screenTimeoutSeconds * 1000))) {
+      true;
+
+  if (canApplyIdleEffect && dimTimeoutSeconds > 0 && !isDimmed &&
+      (millis() - lastActivityTime > (dimTimeoutSeconds * 1000UL))) {
+      LOG_INFO("Main", "Dim timeout reached. Reducing brightness to 20%.");
+      displayManager.setBrightness(DIM_BRIGHTNESS);
+      isDimmed = true;
+  }
+
+  if (canApplyIdleEffect && screenTimeoutSeconds > 0 &&
+      (millis() - lastActivityTime > (screenTimeoutSeconds * 1000UL))) {
 
     // Веб-сервер не активен - можно засыпать
     LOG_INFO(
@@ -1576,7 +1706,7 @@ void loop() {
     unsigned long pseudoSleepStart = millis();
     
     // Poll both buttons — wake on any press, or auto lock on timeout
-    while (digitalRead(BUTTON_1) == HIGH && digitalRead(BUTTON_2) == HIGH) {
+    while (!readBtn1() && !readBtn2()) {
       esp_task_wdt_reset();
       
       if (autoLockSeconds > 0 &&
@@ -1601,7 +1731,7 @@ void loop() {
     }
     
     // Wait for button release before resuming
-    while (digitalRead(BUTTON_1) == LOW || digitalRead(BUTTON_2) == LOW) {
+    while (readBtn1() || readBtn2()) {
       esp_task_wdt_reset();
       delay(10);
     }
@@ -1618,6 +1748,7 @@ void loop() {
       displayManager.turnOn(); // sends TFT_SLPOUT + 120ms delay + backlight
       isScreenOn = true;
     }
+    isDimmed = false; // Always reset dim state after wake from pseudo-sleep
     // Re-sync system clock from DS3231 after wake
     if (rtcManager.getConfig().enabled && rtcManager.isAvailable()) {
       delay(5);
@@ -1672,6 +1803,13 @@ void loop() {
           }
         }
       }
+    }
+
+    // Force full redraw after rotation change (e.g. triggered from web UI)
+    if (displayManager.needsFullRedraw()) {
+        previousKeyIndex = -1;
+        previousPasswordIndex = -1;
+        displayManager.clearFullRedrawFlag();
     }
 
     switch (currentMode) {
@@ -1831,7 +1969,9 @@ void loop() {
 
           bool bleStarted = bleKeyboardManager.begin();
           if (bleStarted) {
-            String pinMsg = "PIN: " + String(bleKeyboardManager.getStaticPIN());
+            String _pinRaw = String(bleKeyboardManager.getStaticPIN());
+            while (_pinRaw.length() < 6) _pinRaw = "0" + _pinRaw;
+            String pinMsg = "PIN: " + _pinRaw;
             displayManager.drawBleAdvertisingPage(
                 bleKeyboardManager.getDeviceName(), pinMsg, 0);
             bleInitialized = true;
@@ -1867,8 +2007,9 @@ void loop() {
           }
 
           if (!pinPageDrawn) {
-            String pinMsg =
-                "Enter PIN: " + String(bleKeyboardManager.getStaticPIN());
+            String _pinRaw2 = String(bleKeyboardManager.getStaticPIN());
+            while (_pinRaw2.length() < 6) _pinRaw2 = "0" + _pinRaw2;
+            String pinMsg = "Enter PIN: " + _pinRaw2;
             displayManager.drawBleAdvertisingPage(
                 bleKeyboardManager.getDeviceName(), pinMsg, 0);
             pinPageDrawn = true;
@@ -1887,7 +2028,7 @@ void loop() {
       }
 
       // Handle back button press
-      if (digitalRead(BUTTON_1) == LOW) {
+      if (readBtn1()) {
         delay(200); // Debounce
         LOG_INFO("Main", "Back button pressed - exiting BLE mode");
         bleKeyboardManager.end();
@@ -1951,7 +2092,7 @@ void loop() {
       }
 
       // Wait for button press
-      if (digitalRead(BUTTON_1) == LOW) { // Back button
+      if (readBtn1()) { // Back button
         delay(200);
         LOG_INFO("Main", "Back button pressed. Cancelling send");
         currentMode = AppMode::PASSWORD;
@@ -1959,7 +2100,7 @@ void loop() {
         bleActionTriggered = false;
         confirmPageDrawn = false;
         lastActivityTime = millis(); // Reset timeout — user just interacted
-      } else if (digitalRead(BUTTON_2) == LOW) { // Send button
+      } else if (readBtn2()) { // Send button
         delay(200);
         LOG_INFO("Main", "Send button pressed. Sending data");
 
@@ -2015,20 +2156,21 @@ void loop() {
       }
 
       // BTN2 — отправить (правая)
-      if (digitalRead(BUTTON_2) == LOW) {
+      if (readBtn2()) {
         delay(50);
-        if (digitalRead(BUTTON_2) == LOW) {
+        if (readBtn2()) {
           String password = passwords[currentPasswordIndex].password;
           displayManager.drawUsbHidPage(passwordName, "Sending...");
           usbHidManager.sendPassword(password.c_str());
           delay(500);
+          lastUsbStatusDrawn = "";
         }
       }
 
       // BTN1 — назад (левая)
-      if (digitalRead(BUTTON_1) == LOW) {
+      if (readBtn1()) {
         delay(50);
-        if (digitalRead(BUTTON_1) == LOW) {
+        if (readBtn1()) {
           usbHidManager.end();
           displayManager.setUsbHidMode(false);
           bleActionTriggered = false;

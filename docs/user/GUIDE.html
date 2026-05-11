@@ -740,6 +740,26 @@
       </div>
       <p>Click <strong>Save Password</strong> to add it to the list.</p>
 
+      <h3>Password Categories</h3>
+      <p>Each password can be assigned a category to organise your vault. A category badge appears above the password name in the list.</p>
+      <table>
+        <thead><tr><th>Category</th><th>Use for</th></tr></thead>
+        <tbody>
+          <tr><td>📋 None</td><td>Uncategorised (default)</td></tr>
+          <tr><td>🌐 Web</td><td>Website logins</td></tr>
+          <tr><td>📱 App</td><td>Mobile or desktop applications</td></tr>
+          <tr><td>🖥 Local</td><td>Local system / device credentials</td></tr>
+          <tr><td>🔑 Key / Token</td><td>API keys, tokens, secrets</td></tr>
+        </tbody>
+      </table>
+      <p>To assign a category:</p>
+      <ul>
+        <li><strong>Quick change:</strong> click the category badge directly on a password row — a small popup appears, select a new category, it saves immediately.</li>
+        <li><strong>Edit modal:</strong> open Edit for any password — the category selector appears above the strength indicator. Change and click Save.</li>
+        <li><strong>Add form:</strong> select a category before clicking Add Password.</li>
+      </ul>
+      <p>Use the category filter bar above the password table to show only entries from a selected category. Click <strong>📋 All</strong> to show everything.</p>
+
       <h3>Password Actions</h3>
       <div class="table-wrap">
         <table>
@@ -759,6 +779,7 @@
           <thead><tr><th>Badge</th><th>Meaning</th></tr></thead>
           <tbody>
             <tr><td>🔒🔒🔒 Locks</td><td>Password strength: 1 lock (red) = weak, 2 locks (yellow) = medium, 3 locks (yellow) = strong. Based on length and character diversity.</td></tr>
+            <tr><td>🌐 📱 🖥 🔑</td><td>Category badge — shown above the password name. Click to change category inline.</td></tr>
             <tr><td>DUP</td><td>Another entry in the vault has an identical password. Detected without decrypting other entries.</td></tr>
             <tr><td>PIN</td><td>Password consists entirely of digits — significantly reduced entropy regardless of length.</td></tr>
             <tr><td>NAME</td><td>Password contains the entry name (or part of it) as a substring, case-insensitive.</td></tr>
@@ -787,8 +808,10 @@
             <tr><td>Theme</td><td>Light, Dark</td></tr>
             <tr><td>Timezone</td><td>Used for the clock widget shown on device screen</td></tr>
             <tr><td>Splash screen</td><td>Image shown on boot: SecureGen (original), Blade Runner 2044, Combs</td></tr>
+            <tr><td>Auto-dim</td><td>Time until the display brightness drops to 20%. Useful for saving battery while keeping the screen on. Must be shorter than Screen timeout. Set to <em>Never</em> to disable.</td></tr>
             <tr><td>Screen timeout</td><td>Time until the display turns off and the device enters low-power pseudo-sleep (CPU slowed to 40 MHz, TFT controller suspended). Press either button to wake — no PIN required. Set to <strong>Never</strong> to keep the screen on indefinitely.</td></tr>
             <tr><td>Auto Lock</td><td>Time after which the device enters deep sleep and wipes all sensitive data from RAM. Requires PIN on wake. Counted from last activity — starts after the device enters pseudo-sleep when screen timeout is enabled, or directly from last button press when screen timeout is Never. Must be longer than screen timeout when both are non-zero. Set to <strong>Never</strong> to disable. Wake from deep sleep: press <span class="key">▼ Bottom</span>.</td></tr>
+            <tr><td>Screen Orientation</td><td><strong>Normal (landscape)</strong> — default, USB port on the right. <strong>Flipped (180°)</strong> — rotates the display 180°. Button mappings are automatically swapped when flipped. Change takes effect immediately — no restart required. Available on both T-Display ESP32 and T-Display-S3.</td></tr>
             <tr><td>DS3231 RTC Module</td><td>External hardware clock. When enabled, the device keeps accurate time without WiFi. Required for TOTP in AP and Offline modes. Configure I2C pins (default SDA=21, SCL=22) and press <strong>Sync &amp; Save</strong> to set time from browser clock.</td></tr>
           </tbody>
         </table>
@@ -835,11 +858,47 @@
         Once disabled, the master key cannot be re-encrypted without a Factory Reset. A reset requires re-importing all keys and passwords from backups.
       </div>
 
-      <h3>BLE Bonding PIN</h3>
-      <p>The PIN entered on your phone during first Bluetooth pairing. Generated randomly on first boot. Can be changed and saved here.</p>
-
       <h3>BLE Hardware Confirmation PIN</h3>
       <p>An additional PIN prompted on the device itself before any BLE password transfer. Prevents unauthorized transfers if someone else has access to the device.</p>
+
+      <h3>Duress PIN</h3>
+      <p>A separate emergency PIN that triggers an immediate, silent wipe of all device data when entered during startup instead of the normal PIN.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Property</th><th>Detail</th></tr></thead>
+          <tbody>
+            <tr><td>Length</td><td>Must match the Startup PIN length (4–10 digits). Configured automatically.</td></tr>
+            <tr><td>Value</td><td>Must differ from your normal Startup PIN.</td></tr>
+            <tr><td>Behaviour</td><td>Device displays <strong>PIN OK</strong> — indistinguishable from normal unlock — then silently erases all data and restarts.</td></tr>
+            <tr><td>Storage</td><td>Stored as a separate PBKDF2-HMAC-SHA256 hash. Never stored in plaintext.</td></tr>
+            <tr><td>Board support</td><td>Both T-Display ESP32 and T-Display-S3.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h4>What is erased</h4>
+      <p>When the Duress PIN is entered, the following is permanently destroyed before restart:</p>
+      <ul>
+        <li>All TOTP / HOTP keys</li>
+        <li>All passwords</li>
+        <li>Device master key (<code>/device.key</code>)</li>
+        <li>WiFi credentials</li>
+        <li>BLE bonding data (NVS partition)</li>
+        <li>All sessions, web admin credentials, PIN configuration</li>
+        <li>The Duress PIN hash itself</li>
+      <li>The entire filesystem partition (~3.9 MB) — erased at the hardware level
+        via <code>esp_partition_erase_range</code>, making file recovery impossible
+        even with direct flash access</li>
+      </ul>
+
+      <h4>How to enable</h4>
+      <p>In the web cabinet, open the <strong>Pin</strong> tab and scroll to the <em>Duress PIN</em> section. Toggle the switch on, enter and confirm the PIN, then click <strong>Save Duress PIN</strong>. To disable, toggle the switch off — the hash file is removed from the device.</p>
+
+      <div class="callout callout-danger">
+        <strong>⚠ Warning — irreversible</strong><br>
+        There is no confirmation prompt. Entry of the Duress PIN immediately and permanently destroys all data. Use only in situations where device compromise is imminent and you must prevent data extraction.
+      </div>
     </div>
 
     <!-- SETTINGS -->
@@ -889,6 +948,11 @@
             <tr><td>1 hour / 6 hours / 24 hours / 3 days</td><td>Session persists across reboots for the selected duration</td></tr>
           </tbody>
         </table>
+      </div>
+      <div class="callout callout-info">
+        <strong>Note — Time synchronization required for persistent sessions</strong><br>
+        Timed modes (1 hour – 3 days) require synchronized system time to validate session age across reboots. Time is synchronized automatically via NTP in WiFi mode, or manually via DS3231 RTC in AP/Offline modes (Display Settings → DS3231 RTC → Sync &amp; Save).<br>
+        In AP mode without RTC, timed modes automatically fall back to <em>until-reboot</em> behavior — sessions remain valid for the current boot only, subject to the 15-minute inactivity timeout.
       </div>
 
       <h3>Device Controls</h3>

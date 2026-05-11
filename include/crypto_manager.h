@@ -63,6 +63,13 @@ public:
     bool isDeviceBlePinConfigured();
     bool isDeviceBlePinEnabled();
     void setDeviceBlePinEnabled(bool enabled);
+
+    // Duress PIN — PBKDF2-hashed, verified before device key unlock
+    bool saveDuressPin(const String& pin);
+    bool verifyDuressPin(const String& pin);
+    bool isDuressPinConfigured();
+    bool isDuressPinEnabled();
+    bool setDuressPinEnabled(bool enabled);
     bool verifyDeviceBlePin(const String& pin); // Проверка Device BLE PIN
     
     uint32_t generateSecurePin();
@@ -96,6 +103,8 @@ public:
     void wipeDeviceKey();
 
 private:
+    // Secure memory zeroing — see include/secure_utils.h
+
     CryptoManager(); // Private constructor
     CryptoManager(const CryptoManager&) = delete;
     void operator=(const CryptoManager&) = delete;

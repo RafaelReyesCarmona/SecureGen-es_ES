@@ -1,4 +1,5 @@
 #include "secure_layer_manager.h"
+#include "secure_utils.h"
 #include "device_static_key.h"
 #include "mbedtls/ecdh.h"
 #include "mbedtls/gcm.h"
@@ -123,12 +124,14 @@ bool SecureLayerManager::processKeyExchange(const String& clientId, const String
     uint8_t sharedSecret[32];
     if (!performECDH(clientPubKey, 65, sharedSecret)) {
         response = "{\"type\":\"keyexchange\",\"status\":\"error\",\"message\":\"ECDH failed\"}";
+        secure_memzero(sharedSecret, sizeof(sharedSecret));
         return false;
     }
     
     // Derive session key using HKDF with client nonce as salt
     if (!deriveSessionKey(sharedSecret, session->clientNonce, session->sessionKey)) {
         response = "{\"type\":\"keyexchange\",\"status\":\"error\",\"message\":\"Key derivation failed\"}";
+        secure_memzero(sharedSecret, sizeof(sharedSecret));
         return false;
     }
     
@@ -143,6 +146,7 @@ bool SecureLayerManager::processKeyExchange(const String& clientId, const String
     
     response = "{\"type\":\"keyexchange\",\"status\":\"success\",\"pubkey\":\"" + serverPubKey + "\",\"salt\":\"" + saltHex + "\"}";
     
+    secure_memzero(sharedSecret, sizeof(sharedSecret));
     LOG_INFO("🔐", "KeyExchange OK: " + clientId.substring(0,8) + "... [Sessions:" + String(sessions.size()) + "]");
     return true;
 }
@@ -198,12 +202,14 @@ bool SecureLayerManager::processProtectedKeyExchange(const String& clientId, con
     uint8_t sharedSecret[32];
     if (!performECDH(clientPubKey, 65, sharedSecret)) {
         response = "{\"type\":\"keyexchange\",\"status\":\"error\",\"message\":\"ECDH computation failed\"}";
+        secure_memzero(sharedSecret, sizeof(sharedSecret));
         return false;
     }
     
     // 6. Derive session key с использованием shared secret
     if (!deriveSessionKey(sharedSecret, session->clientNonce, session->sessionKey)) {
         response = "{\"type\":\"keyexchange\",\"status\":\"error\",\"message\":\"Session key derivation failed\"}";
+        secure_memzero(sharedSecret, sizeof(sharedSecret));
         return false;
     }
     
@@ -220,12 +226,14 @@ bool SecureLayerManager::processProtectedKeyExchange(const String& clientId, con
     if (encryptedServerKey.isEmpty()) {
         LOG_ERROR("🔐", "Failed to encrypt server public key");
         response = "{\"type\":\"keyexchange\",\"status\":\"error\",\"message\":\"Server key encryption failed\"}";
+        secure_memzero(sharedSecret, sizeof(sharedSecret));
         return false;
     }
     
     // 9. Формируем защищенный response
     response = "{\"type\":\"keyexchange\",\"status\":\"success\",\"encrypted_pubkey\":\"" + encryptedServerKey + "\"}";
     
+    secure_memzero(sharedSecret, sizeof(sharedSecret));
     LOG_INFO("🔐", "Protected KeyExchange SUCCESS: " + clientId.substring(0,8) + "... [Sessions:" + String(sessions.size()) + "]");
     return true;
 }

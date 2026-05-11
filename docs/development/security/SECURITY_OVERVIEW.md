@@ -104,3 +104,13 @@ Compatible authenticator apps: Google Authenticator, Microsoft Authenticator, Au
 **Make regular encrypted backups.** Use the export function to save an encrypted backup. Store it in a safe place — it is the only way to recover your data after a factory reset or hardware failure.
 
 **Use strong credentials.** The web admin password and PIN are your primary defense. Longer credentials increase brute-force time exponentially regardless of PBKDF2 iteration count.
+
+---
+
+## Secure Memory Zeroing
+
+All sensitive stack buffers are zeroed immediately after use via `secure_memzero()` from `include/secure_utils.h`. Uses volatile pointer pattern — guaranteed to execute even under -O3 optimization.
+
+**Covered functions:** decryptDeviceKeyWithPin (v2/v3), encryptDeviceKeyWithPin, handleKeyExchange, processProtectedKeyExchange, hashPassword, verifyPassword, verifyDuressPin, encryptWithPassword, decryptWithPassword, wipeDeviceKey, wipeAllSessions, removeSession.
+
+**Protected data:** derived keys, plaintext device key, ECDH shared secrets, PIN hashes, decrypted vault data.

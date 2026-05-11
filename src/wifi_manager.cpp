@@ -167,11 +167,12 @@ void WifiManager::startConfigPortal() {
     _display.showMessage(ap_ssid, 15, 60, false, 2);
     _display.showMessage("2. Go to 192.168.4.1", 10, 90);
 
+    // WIFI_AP_STA required: scanNetworks() needs STA interface active.
+    // WIFI_AP alone leaves STA null → LoadProhibited crash on scan start.
+    WiFi.mode(WIFI_AP_STA);
     bool apStarted = WiFi.softAP(ap_ssid);
     if (apStarted) {
-        LOG_INFO("WifiManager", "Access point started successfully");
-        WiFi.scanNetworks(true); // async, не блокирует
-        // DNS НЕ стартуем здесь
+        LOG_INFO("WifiManager", "Access point started successfully (AP+STA mode for scan)");
     } else {
         LOG_ERROR("WifiManager", "Failed to start access point");
     }

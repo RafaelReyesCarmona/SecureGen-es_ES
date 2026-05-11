@@ -282,6 +282,9 @@ pio run -e lilygo-t-display-s3 -t upload
 
 ## 📚 Documentation
 
+> 🔌 **Want to run SecureGen on your own hardware?**  
+> See the [Hardware Porting Guide](docs/development/PORTING.md) — hardware requirements, step-by-step board setup, and which `#ifdef` to touch.
+
 | Document | Audience |
 |----------|----------|
 | [User Manual](docs/user/GUIDE.html) | All users — setup, operation, features |
@@ -292,36 +295,25 @@ pio run -e lilygo-t-display-s3 -t upload
 | [API Endpoints](docs/development/ENDPOINTS.md) | Developer API reference |
 | [System Design](docs/development/system_design.md) | Architecture and boot sequence |
 | [Logging System](docs/development/LOGGING_SYSTEM.md) | Debug and log configuration |
-| [Multi-Board Support](docs/development/multi-board.md) | Porting guide for ESP32/S3 boards |
+| [Multi-Board Support](docs/development/multi-board.md) | Internal multi-board development rules (for maintainers) |
+| [Hardware Porting Guide](docs/development/PORTING.md) | Port SecureGen to your own ESP32 board |
 
 ---
 
 ## 🗺️ Roadmap
 
 ### User Experience
-- Quick search by account name, favorites / pinned accounts, grouping by tags (work, personal, finance)
-- Manual sorting and favorites (star icon) for TOTP/passwords
-- Category icons (🌐 web, 📱 app, 🖥 local, 🔑 token) for visual navigation
-- Password age tracking and creation date display
-- Display settings in web interface (brightness, auto-dim, orientation)
+- Quick search by favorites / pinned accounts
+- Display settings in web interface (brightness)
 
 ### Security Enhancements
-- Multi-layer duress PIN (decoy accounts → real vault)
-- Factory wipe PIN (emergency full erase trigger)
-- Memory obfuscation (uniform noise blocks, vault address derived from password)
-- Time-based access windows (vault unavailable during specified hours)
-- Audit log (login history, key access, password changes)
+- **Export with physical presence confirmation** — export requires button press on 
+  device; ephemeral key derived on-device, never entered manually
 - Flash encryption and secure boot (optional hardening)
 - ATECC608 secure element support
 
-### Hardware & Platform
-- Vibration motor support for tactile feedback
-
 ### Cryptography
-- Migration ECDH P-256 → X25519
-
-### Web Interface
-- Informative setting flags in web cabinet
+- Migration ECDH P-256 → X25519 (~400ms → ~80ms key exchange)
 
 ---
 

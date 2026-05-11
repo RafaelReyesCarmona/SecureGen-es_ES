@@ -30,6 +30,10 @@ public:
     String getBootMode();
     bool saveBootMode(const String& mode);
     
+    // Display Rotation functions
+    uint8_t getDisplayRotation();
+    bool saveDisplayRotation(uint8_t rotation);
+    
 #ifdef BOARD_HAS_USB_HID
     String getDefaultHidMode();
     bool saveDefaultHidMode(const String& mode);
@@ -59,6 +63,9 @@ public:
     
     uint32_t getAutoLockTimeout();
     bool saveAutoLockTimeout(uint32_t timeout);
+    
+    uint16_t getDimTimeout();
+    bool saveDimTimeout(uint16_t timeout);
 
     String getTimezone();
     bool saveTimezone(const String& tz);
@@ -76,6 +83,8 @@ private:
     bool _displayTimeoutCached = false; // Flag to track if timeout is cached
     uint32_t _cachedAutoLockTimeout = 0; // Default auto lock timeout (cached, 0=Never)
     bool _autoLockTimeoutCached = false; // Flag to track if auto lock timeout is cached
+    uint16_t _cachedDimTimeout = 0; // Default dim timeout (cached, 0=Never)
+    bool _dimTimeoutCached = false; // Flag to track if dim timeout is cached
     SessionDuration _currentSessionDuration = SIX_HOURS; // Default session duration
 };
 

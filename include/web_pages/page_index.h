@@ -154,7 +154,9 @@ label {
     position: relative;
     display: inline-block;
     width: 60px;
+    min-width: 60px;
     height: 34px;
+    flex-shrink: 0;
 }
 
 .switch input {
@@ -768,11 +770,183 @@ progress::-webkit-progress-value {
     }
 }
 
+/* Badge styles - global */
+.key-badge {
+    display: inline-block;
+    font-size: 0.7em;
+    color: #c0c0c0;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 3px;
+    padding: 0 5px;
+    margin: 1px 3px 1px 0;
+    white-space: nowrap;
+}
+
+.key-badges {
+    display: block;
+    margin-top: 3px;
+}
+
+/* Category filter bar */
+#cat-filter-container {
+    width: 100%;
+    max-width: 800px;
+    margin: 20px auto 0 auto;
+}
+.cat-filter-bar {
+    display: flex;
+    gap: 0;
+    margin-bottom: 0;
+    width: 100%;
+}
+.cat-filter-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 7px 6px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    background: rgba(255,255,255,0.07);
+    color: #aaa;
+    cursor: pointer;
+    font-size: 13px;
+    font-family: inherit;
+    font-weight: 500;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+    white-space: nowrap;
+    overflow: hidden;
+    outline: none;
+}
+.cat-filter-btn:hover {
+    background: rgba(255,255,255,0.13);
+    color: #fff;
+    border-color: rgba(255,255,255,0.3);
+}
+.cat-filter-btn.active {
+    background: rgba(90, 158, 238, 0.2);
+    color: #5a9eee;
+    border-color: #5a9eee;
+    font-weight: 600;
+}
+.cat-filter-btn .cat-emoji {
+    font-size: 16px;
+    line-height: 1;
+}
+.cat-filter-btn:first-child {
+    border-radius: 15px 8px 0 0;
+}
+.cat-filter-btn:last-child {
+    border-radius: 8px 15px 0 0;
+}
+@media (max-width: 480px) {
+    .cat-filter-btn span:not(.cat-emoji) { display: none; }
+    .cat-filter-btn { padding: 8px 4px; }
+}
+
+/* Category badge (above password name) */
+.badge-category {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 7px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    user-select: none;
+    margin-bottom: 3px;
+    transition: opacity 0.15s;
+}
+.badge-category:hover { opacity: 0.8; }
+.badge-cat-web   { background: #dbeafe; color: #1e40af; }
+.badge-cat-app   { background: #fce7f3; color: #9d174d; }
+.badge-cat-local { background: #dcfce7; color: #166534; }
+.badge-cat-key   { background: #fef9c3; color: #854d0e; }
+.badge-cat-none  { background: var(--bg-tertiary); color: var(--text-muted); border: 1px dashed var(--border); }
+
+/* Dark mode category badge overrides */
+@media (prefers-color-scheme: dark) {
+    .badge-cat-web   { background: #1e3a5f; color: #93c5fd; }
+    .badge-cat-app   { background: #4a1942; color: #f9a8d4; }
+    .badge-cat-local { background: #14421e; color: #86efac; }
+    .badge-cat-key   { background: #422006; color: #fde047; }
+}
+
+/* Category quick-select popup */
+.cat-popup {
+    position: absolute;
+    z-index: 9999;
+    min-width: 180px;
+    padding: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+.cat-popup-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #e0e0e0;
+    transition: background 0.12s;
+}
+.cat-popup-item:hover {
+    background: rgba(255,255,255,0.1);
+}
+.cat-popup-item.selected {
+    background: rgba(90, 158, 238, 0.2);
+    color: #5a9eee;
+    font-weight: 600;
+}
+.cat-popup-item .cat-emoji {
+    font-size: 16px;
+    flex-shrink: 0;
+}
+
+/* Category selector in forms (edit/add modal) */
+.cat-selector-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 12px;
+    margin-bottom: 12px;
+}
+.cat-selector-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-secondary);
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-secondary);
+    transition: border-color 0.15s;
+}
+.cat-selector-btn:hover { border-color: var(--border-active); }
+.cat-selector-btn .cat-emoji { font-size: 18px; }
+
+
 /* Responsive design */
 @media (max-width: 768px) {
     .form-container, .content-box, .tabs, .tab-content {
         margin: 10px;
         padding: 20px;
+    }
+
+    #cat-filter-container {
+        margin: 20px auto 0 auto;
     }
 
     #widget-bar {
@@ -811,13 +985,16 @@ progress::-webkit-progress-value {
     #passwords-table th:nth-child(3), #passwords-table td:nth-child(3) { width: 150px; } /* Actions */
 
     @media (max-width: 768px) {
+        #passwords-table th:nth-child(3),
         #passwords-table td:nth-child(3) {
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             gap: 3px;
-            width: 100%;
+            width: 100px;
+            min-width: 100px;
+            max-width: 100px;
             box-sizing: border-box;
         }
     }
@@ -825,6 +1002,17 @@ progress::-webkit-progress-value {
     th, td {
         padding: 12px 8px;
         white-space: nowrap;
+    }
+
+    #keys-table th:nth-child(1), #keys-table td:nth-child(1) {
+        width: 20px !important;
+        padding: 5px 2px !important;
+    }
+
+    #keys-table th:nth-child(2), #keys-table td:nth-child(2),
+    #keys-table th:nth-child(3), #keys-table td:nth-child(3),
+    #keys-table th:nth-child(4), #keys-table td:nth-child(4) {
+        padding: 5px 3px !important;
     }
 
     /* Keys table mobile optimization */
@@ -835,14 +1023,16 @@ progress::-webkit-progress-value {
 
     #keys-table th:nth-child(2), /* Name */
     #keys-table td:nth-child(2) {
-        width: 50px !important;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        width: 65px !important;
+        max-width: 65px;
+        white-space: normal;
+        overflow: visible;
+        word-break: break-word;
     }
 
     #keys-table th:nth-child(3), /* Code */
     #keys-table td:nth-child(3) {
-        width: 70px !important;
+        width: 90px !important;
         font-size: 1.1rem;
     }
 
@@ -851,14 +1041,9 @@ progress::-webkit-progress-value {
         width: 35px !important;
     }
 
-    #keys-table th:nth-child(6), /* Actions */
-    #keys-table td:nth-child(6) {
-        width: 50px !important;
-    }
-
     #keys-table th:nth-child(6),
     #keys-table td:nth-child(6) {
-        width: auto !important;
+        width: 60px !important;
         white-space: nowrap;
         padding: 2px 4px;
     }
@@ -866,6 +1051,9 @@ progress::-webkit-progress-value {
     #keys-table td:nth-child(6) {
         text-align: center;
         vertical-align: middle;
+    }
+
+    #keys-table td:nth-child(6) > div {
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -956,6 +1144,10 @@ progress::-webkit-progress-value {
     .form-container, .content-box, .tabs, .tab-content {
         margin: 5px;
         padding: 15px;
+    }
+
+    #cat-filter-container {
+        margin: 20px auto 0 auto;
     }
 
     table {
@@ -1239,10 +1431,19 @@ b){var c={},d;for(d=0;d<b.length;d++)void 0!==a[b[d]]&&(c[b[d]]=a[b[d]]);return 
                 <input type="text" id="password-value" name="password" class="user-activity" required>
                 <span class="password-generate" onclick="openPasswordGeneratorModal()" title="Generate Password">#</span>
             </div>
+            <div class="cat-selector-wrap">
+                <label data-i18n="passwords.cat.label">Category:</label>
+                <button type="button" class="cat-selector-btn" id="add-cat-btn"
+                    onclick="openCatPopup(event, this, (catId) => { _addCatValue = catId; updateAddCatBtn(); })">
+                  <span class="cat-emoji" id="add-cat-emoji">📋</span>
+                  <span id="add-cat-label">All</span>
+                </button>
+            </div>
             <button type="submit" class="button user-activity" data-i18n="passwords.add.btn">Add Password</button>
         </form>
     </div>
-    <div class="content-box">
+    <div id="cat-filter-container"></div>
+    <div class="content-box" style="border-radius: 0 0 15px 15px; margin-top: 0;">
         <h4 data-i18n="passwords.current.title">Current Passwords</h4>
         <table id="passwords-table">
             <thead><tr><th>::</th><th data-i18n="passwords.col.name">Name</th><th data-i18n="passwords.col.actions">Actions</th></tr></thead>
@@ -1348,9 +1549,30 @@ b){var c={},d;for(d=0;d<b.length;d++)void 0!==a[b[d]]&&(c[b[d]]=a[b[d]]);return 
         </div>
     </div>
 
+    <!-- Display Rotation -->
+    <div class="form-container">
+        <h4 data-i18n="display.rotation.title">Display Orientation</h4>
+        <label for="display-rotation" data-i18n="display.rotation.label">Screen orientation:</label>
+        <select id="display-rotation" name="display_rotation" class="user-activity" style="width: 100%; padding: 8px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 16px;" onchange="saveDisplayRotation(this.value)">
+            <option value="1" data-i18n="display.rotation.normal">Normal (landscape)</option>
+            <option value="3" data-i18n="display.rotation.flipped">Flipped (180°)</option>
+        </select>
+    </div>
+
     <div class="form-container">
         <h4 data-i18n="display.lock.title">Screen &amp; Lock Settings</h4>
         <form id="display-timeout-form">
+            <label for="dim-timeout" data-i18n="display.lock.dim.label">Auto-dim (reduce brightness to 20% after):</label>
+            <select id="dim-timeout" name="dim_timeout" required class="user-activity" style="width: 100%; padding: 8px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 16px;">
+                <option value="5" data-i18n="display.lock.opt.5s">5 seconds</option>
+                <option value="10" data-i18n="display.lock.opt.10s">10 seconds</option>
+                <option value="15" data-i18n="display.lock.opt.15s">15 seconds</option>
+                <option value="30" data-i18n="display.lock.opt.30s">30 seconds</option>
+                <option value="60" data-i18n="display.lock.opt.1m">1 minute</option>
+                <option value="300" data-i18n="display.lock.opt.5m">5 minutes</option>
+                <option value="0" data-i18n="display.lock.never">Never</option>
+            </select>
+            
             <label for="display-timeout" data-i18n="display.lock.screen.label">Screen timeout (turn off display after):</label>
             <select id="display-timeout" name="display_timeout" required class="user-activity" style="width: 100%; padding: 8px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 16px;">
                 <option value="15" data-i18n="display.lock.opt.15s">15 seconds</option>
@@ -1397,34 +1619,6 @@ b){var c={},d;for(d=0;d<b.length;d++)void 0!==a[b[d]]&&(c[b[d]]=a[b[d]]);return 
         </form>
     </div>
 
-    <!-- BLE Bonding PIN Section -->
-    <div class="form-container" style="margin-top: 30px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 25px;">
-        <h4 data-i18n="pin.ble.title" style="color: #4a90e2; margin-bottom: 15px;">BLE Bonding PIN</h4>
-        <p style="color: #888; font-size: 0.9em; margin-bottom: 20px;"><strong>Security Notice:</strong> <span data-i18n="pin.ble.notice">This PIN is displayed on device screen during BLE pairing for client authentication.</span></p>
-        
-        <form id="ble-bonding-pin-form">
-            <label for="ble-bonding-pin" data-i18n="pin.ble.label.new">New BLE Bonding PIN (6 digits):</label>
-            <div class="password-input-container">
-                <input type="password" id="ble-bonding-pin" name="ble_bonding_pin" pattern="\d{6}" maxlength="6" placeholder="Enter 6-digit PIN" data-i18n="pin.placeholder.enter" data-i18n-attr="placeholder" class="user-activity">
-                <span class="password-toggle" onclick="togglePasswordVisibility('ble-bonding-pin', this)">O</span>
-            </div>
-            
-            <label for="ble-bonding-pin-confirm" data-i18n="pin.ble.label.confirm">Confirm BLE Bonding PIN:</label>
-            <div class="password-input-container">
-                <input type="password" id="ble-bonding-pin-confirm" name="ble_bonding_pin_confirm" pattern="\d{6}" maxlength="6" placeholder="Confirm 6-digit PIN" data-i18n="pin.placeholder.confirm" data-i18n-attr="placeholder" class="user-activity">
-                <span class="password-toggle" onclick="togglePasswordVisibility('ble-bonding-pin-confirm', this)">O</span>
-            </div>
-            
-            <div style="margin: 15px 0; padding: 12px; background: rgba(255,193,7,0.1); border: 1px solid rgba(255,193,7,0.3); border-radius: 6px;">
-                <small style="color: #ffc107; font-size: 0.85rem;">
-                    <strong>Important:</strong> <span data-i18n="pin.ble.important">This PIN will be displayed on the ESP32 screen during BLE pairing for clients to enter.</span>
-                </small>
-            </div>
-
-            <button type="submit" data-i18n="pin.ble.btn" class="button user-activity" style="background-color: #28a745;">Update BLE Bonding PIN</button>
-        </form>
-    </div>
-
     <!-- Device BLE PIN Section -->
     <div class="form-container" style="margin-top: 30px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 25px;">
         <h4 data-i18n="pin.device.title" style="color: #4a90e2; margin-bottom: 15px;">Device BLE PIN</h4>
@@ -1467,6 +1661,53 @@ b){var c={},d;for(d=0;d<b.length;d++)void 0!==a[b[d]]&&(c[b[d]]=a[b[d]]);return 
             </form>
         </div>
     </div>
+
+    <!-- Duress PIN Section -->
+    <div class="form-container" style="margin-top:30px;border-top:1px solid rgba(255,255,255,0.1);padding-top:25px;">
+        <h4 data-i18n="pin.duress.title" style="color:#e24a4a;margin-bottom:15px;">Duress PIN</h4>
+        <p style="color:#888;font-size:0.9em;margin-bottom:20px;">
+            <strong>Security Notice:</strong>
+            <span data-i18n="pin.duress.notice">Entering this PIN will permanently destroy all data on the device.</span>
+        </p>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;padding:15px;background:rgba(255,255,255,0.05);border-radius:8px;">
+            <div>
+                <label for="duress-pin-enabled" data-i18n="pin.duress.label.enable" style="font-size:16px;font-weight:500;margin:0;">Enable Duress PIN</label>
+                <p data-i18n="pin.duress.desc" style="margin:5px 0 0 0;font-size:13px;color:rgba(255,255,255,0.6);">A separate PIN that wipes the device when entered</p>
+            </div>
+            <label class="switch">
+                <input type="checkbox" id="duress-pin-enabled" class="user-activity" onchange="toggleDuresspinFields()">
+                <span class="slider"></span>
+            </label>
+        </div>
+        <div id="duress-pin-fields" style="display:none;">
+            <form id="duress-pin-form">
+                <label for="duress-pin" data-i18n="pin.duress.label.new">New Duress PIN (same length as startup PIN):</label>
+                <div class="password-input-container">
+                    <input type="password" id="duress-pin" name="duress_pin"
+                           pattern="\d{4,10}" maxlength="6"
+                           placeholder="Enter duress PIN"
+                           class="user-activity">
+                    <span class="password-toggle" onclick="togglePasswordVisibility('duress-pin',this)">O</span>
+                </div>
+                <label for="duress-pin-confirm" data-i18n="pin.duress.label.confirm">Confirm Duress PIN:</label>
+                <div class="password-input-container">
+                    <input type="password" id="duress-pin-confirm" name="duress_pin_confirm"
+                           pattern="\d{4,10}" maxlength="6"
+                           placeholder="Confirm duress PIN"
+                           class="user-activity">
+                    <span class="password-toggle" onclick="togglePasswordVisibility('duress-pin-confirm',this)">O</span>
+                </div>
+                <div style="margin:15px 0;padding:12px;background:rgba(220,53,69,0.15);border:1px solid rgba(220,53,69,0.4);border-radius:6px;">
+                    <small style="color:#ff6b6b;font-size:0.85rem;">
+                        <strong>&#9888; Warning:</strong>
+                        <span data-i18n="pin.duress.important">This PIN must differ from your main PIN. Entry immediately destroys all data.</span>
+                    </small>
+                </div>
+                <button type="submit" data-i18n="pin.duress.btn" class="button user-activity" style="background-color:#dc3545;">Save Duress PIN</button>
+            </form>
+        </div>
+    </div>
+
 </div>
 
 <div id="Settings" class="tab-content">
@@ -1515,6 +1756,7 @@ b){var c={},d;for(d=0;d<b.length;d++)void 0!==a[b[d]]&&(c[b[d]]=a[b[d]]);return 
                 <li id="pwd-lowercase" data-i18n="settings.pwd.req.lower">A lowercase letter</li>
                 <li id="pwd-number" data-i18n="settings.pwd.req.number">A number</li>
                 <li id="pwd-special" data-i18n="settings.pwd.req.special">A special character (!@#$%)</li>
+                <li id="pwd-no-username" data-i18n="settings.pwd.req.nousername">Password must not contain your username</li>
             </ul>
             <label for="confirm-password" id="confirm-password-label" data-i18n="settings.pwd.web.confirm.label">Confirm New Web Password</label>
             <div class="password-input-container">
@@ -1612,7 +1854,7 @@ b){var c={},d;for(d=0;d<b.length;d++)void 0!==a[b[d]]&&(c[b[d]]=a[b[d]]);return 
     <div class="form-container">
         <h4 data-i18n="settings.webserver.title">Web Server</h4>
         <form id="web-server-settings-form">
-            <label for="web-server-timeout" data-i18n="settings.webserver.label">Auto-shutdown on inactivity:</label>
+            <label for="web-server-timeout" data-i18n="settings.webserver.label">Auto-shutdown on inactivity (WiFi Mode):</label>
             <select id="web-server-timeout" name="web_server_timeout" required class="user-activity" style="width: 100%; padding: 8px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 10px;">
                 <option value="5" data-i18n="settings.webserver.opt.5m">5 minutes</option>
                 <option value="10" data-i18n="settings.webserver.opt.10m">10 minutes</option>
@@ -1716,6 +1958,14 @@ b){var c={},d;for(d=0;d<b.length;d++)void 0!==a[b[d]]&&(c[b[d]]=a[b[d]]);return 
                 <input type="text" id="edit-password-value" style="width: calc(100% - 52px); font-family: monospace;" class="user-activity" required>
                 <span class="password-generate" onclick="generatePasswordForEdit()" title="Generate Password">#</span>
                 <span class="password-toggle" onclick="togglePasswordVisibility('edit-password-value', this)">O</span>
+            </div>
+            <div class="cat-selector-wrap">
+                <label data-i18n="passwords.cat.label">Category:</label>
+                <button type="button" class="cat-selector-btn" id="edit-cat-btn"
+                    onclick="openCatPopup(event, this, (catId) => { _editCatValue = catId; updateEditCatBtn(); })">
+                  <span class="cat-emoji" id="edit-cat-emoji">📋</span>
+                  <span id="edit-cat-label">All</span>
+                </button>
             </div>
             <div class="password-strength-container">
                 <div class="password-strength-bar">
@@ -1862,6 +2112,7 @@ function logout(){CacheManager.clear();const formData=new FormData();makeEncrypt
 function showStatus(message,isError=false){const statusDiv=document.getElementById('status');statusDiv.textContent=message;statusDiv.className='status-message '+(isError?'status-err':'status-ok');statusDiv.style.display='block';setTimeout(()=>statusDiv.style.display='none',5000)}
 
 let appInitialized = false;
+let devicePinLength = 6; // updated from /api/pincode_settings
 function openTab(evt,tabName){
     if (!appInitialized) {
         showCopyNotification(tr('ui.loading') || 'Loading...');
@@ -1923,13 +2174,13 @@ function fetchKeys(){
     // ⚡ CACHE: Проверяем кеш для списка ключей (только имена!)
     const cachedKeys = CacheManager.get('keys_list');
     if (cachedKeys) {
-        console.log('⚡ Using cached keys list, updating TOTP codes from server...');
+        console.log('⚡ Using cached keys list, fetching fresh TOTP codes...');
         keysData = cachedKeys;
         updateKeysTable(cachedKeys);
         if (keysUpdateInterval) clearInterval(keysUpdateInterval);
         keysUpdateInterval = setInterval(updateTOTPCodes, 1000);
-        // Продолжаем запрос в фоне для обновления TOTP кодов
-        // Return a resolved promise for the cache hit case
+        // Force immediate server fetch — cache has no codes or sync state
+        updateTOTPCodes(true);
         return Promise.resolve();
     }
     
@@ -2007,8 +2258,9 @@ function updateKeysTable(data) {
         // Build timer and progress cells based on key type
         const isHOTP = key.t === 'H';
         const period = key.p || 30;
+        const hotpCounter = (key.c !== undefined && key.c !== null) ? key.c : 0;
         const timerCell = isHOTP 
-            ? `<td><span id="timer-${index}" style="color:#888;">🔄</span></td>`
+            ? `<td><span id="timer-${index}" style="color:#44ff44;">🔄 ${hotpCounter}</span></td>`
             : `<td><span id="timer-${index}" style="font-weight:bold;color:#44ff44;">${key.timeLeft}s</span></td>`;
         const progressCell = isHOTP
             ? `<td><span id="progress-${index}"></span></td>`
@@ -2021,9 +2273,11 @@ function updateKeysTable(data) {
             ${timerCell}
             ${progressCell}
             <td>
-                <button class="button-action button-qr user-activity" onclick="showQrOnDisplay(${index})" style="margin-right: 5px;" title="Show QR code on device">📱</button>
-                ${isHOTP ? `<button class="button-action button-hotp user-activity" onclick="refreshHOTPCode(${index})" style="margin-right:5px;background:#4CAF50;" title="Generate next HOTP code">${tr('keys.btn.next')}</button>` : ''}
-                <button class="button-delete user-activity" onclick="removeKey(${index})">${tr('keys.btn.remove')}</button>
+                <div>
+                    <button class="button-action button-qr user-activity" onclick="showQrOnDisplay(${index})" style="margin-right: 5px;" title="Show QR code on device">📱</button>
+                    ${isHOTP ? `<button class="button-action button-hotp user-activity" onclick="refreshHOTPCode(${index})" style="margin-right:5px;background:#4CAF50;" title="Generate next HOTP code">${tr('keys.btn.next')}</button>` : ''}
+                    <button class="button-delete user-activity" onclick="removeKey(${index})">${tr('keys.btn.remove')}</button>
+                </div>
             </td>
         `;
     });
@@ -2032,7 +2286,7 @@ function updateKeysTable(data) {
     initializeDragAndDrop('keys-table', 'keys');
 }
 
-function updateTOTPCodes() {
+function updateTOTPCodes(force = false) {
     // 🔧 FIX: Если keysData пустой массив - НЕ делаем запросы
     if (keysData && keysData.length === 0) {
         return; // Нет ключей - не обновляем
@@ -2051,7 +2305,7 @@ function updateTOTPCodes() {
     const timeInPeriod = minPeriod > 0 ? currentTime % minPeriod : 999;
     
     const hasHOTPKeys = keysData && keysData.some(k => k.t === 'H');
-    if (timeInPeriod <= 1 || !keysData || (hasHOTPOnly && currentTime % 5 === 0)) {
+    if (force || timeInPeriod <= 1 || !keysData || (hasHOTPOnly && currentTime % 5 === 0)) {
         // 🔐 ИСПРАВЛЕНИЕ: Используем ту же логику расшифровки что и в fetchKeys()
         makeAuthenticatedRequest('/api/keys')
         .then(async response => {
@@ -2139,8 +2393,9 @@ function updateTOTPDisplay(data) {
             // Handle HOTP differently - no timer, no progress bar
             if (key.t === 'H') {
                 progressElement.style.display = 'none';
-                timerElement.textContent = '🔄';
-                timerElement.style.color = '#888';
+                const cachedCounter = (key.c !== undefined && key.c !== null) ? key.c : 0;
+                timerElement.textContent = '🔄 ' + cachedCounter;
+                timerElement.style.color = '#44ff44';
                 timerElement.style.fontWeight = 'normal';
                 timerElement.style.animation = 'none';
             } else {
@@ -2211,6 +2466,8 @@ function formatKeyMetadata(key) {
     const parts = [];
     if (key.t === 'H') {
         parts.push('HOTP');
+    } else {
+        parts.push('TOTP');
     }
     if (key.a === '256') {
         parts.push('SHA256');
@@ -2223,7 +2480,48 @@ function formatKeyMetadata(key) {
     if (key.t !== 'H' && key.p === 60) {
         parts.push('60s');
     }
-    return parts.length > 0 ? ' <span style="font-size:0.75em; color:#b0b0b0;">(' + parts.join(' • ') + ')</span>' : '';
+    return parts.length > 0
+        ? ' <span class="key-badges">' + parts.map(p => '<span class="key-badge">' + p + '</span>').join('') + '</span>'
+        : '';
+}
+
+function formatPasswordMetadata(pwd, allPasswords) {
+    const parts = [];
+    
+    // DUP: pw_hash matches another entry
+    if (pwd.pw_hash && pwd.pw_hash.length > 0) {
+        const dupFound = allPasswords.some(p =>
+            p !== pwd && p.pw_hash && p.pw_hash === pwd.pw_hash
+        );
+        if (dupFound) parts.push('DUP');
+    }
+    
+    // Strength (only Weak and Medium — Strong is the default/good state)
+    if (pwd.strength === 1) parts.push('Weak');
+    else if (pwd.strength === 2) parts.push('Medium');
+    else if (pwd.strength === 3) parts.push('Strong');
+    
+    // PIN: password contains only digits
+    if (pwd.password && pwd.password.length > 0 &&
+        /^\d+$/.test(pwd.password)) {
+        parts.push('PIN');
+    }
+    
+    // NAME: password contains a word from the name (>=3 chars, case-insensitive)
+    if (pwd.password && pwd.name) {
+        const pwLower = pwd.password.toLowerCase();
+        const nameLower = pwd.name.toLowerCase();
+        const words = nameLower.match(/[a-z]{3,}/g) || [];
+        if (words.some(w => pwLower.includes(w))) {
+            parts.push('NAME');
+        }
+    }
+    
+    return parts.length > 0
+        ? ' <span class="key-badges">' +
+          parts.map(p => '<span class="key-badge">' + p + '</span>').join('') +
+          '</span>'
+        : '';
 }
 
 // Initialize type toggle listeners
@@ -2342,6 +2640,8 @@ function refreshHOTPCode(index) {
                 keysData[index].c = data.counter;
                 const codeEl = document.getElementById('code-' + index);
                 if (codeEl) codeEl.textContent = data.code;
+                const timerEl = document.getElementById('timer-' + index);
+                if (timerEl) timerEl.textContent = '🔄 ' + data.counter;
             }
             showStatus(tr('keys.hotp.generated'), false);
         }
@@ -2478,6 +2778,8 @@ function useGeneratedPassword() {
 
 // Password Edit Modal Functions
 let currentEditIndex = -1;
+let _editCatValue = '';
+let _addCatValue = '';
 
 function editPassword(index) {
     if (!passwordsData || !passwordsData[index]) {
@@ -2514,6 +2816,8 @@ function editPassword(index) {
             
             document.getElementById('edit-password-name').value = data.name || '';
             document.getElementById('edit-password-value').value = data.password || '';
+            _editCatValue = data.category || '';
+            updateEditCatBtn();
             updatePasswordStrengthForEdit(data.password || '');
             openPasswordEditModal();
         })
@@ -2534,7 +2838,30 @@ function closePasswordEditModal() {
     // Очищаем поля
     document.getElementById('edit-password-name').value = '';
     document.getElementById('edit-password-value').value = '';
+    _editCatValue = '';
     updatePasswordStrengthForEdit('');
+}
+
+function updateEditCatBtn() {
+    const cat = getCatInfo(_editCatValue);
+    const emojiEl = document.getElementById('edit-cat-emoji');
+    const labelEl = document.getElementById('edit-cat-label');
+    const btnEl = document.getElementById('edit-cat-btn');
+    if (!emojiEl) return;
+    emojiEl.textContent = cat.emoji;
+    labelEl.textContent = _editCatValue ? tr(cat.labelKey) : tr('passwords.cat.none');
+    btnEl.dataset.cat = _editCatValue;
+}
+
+function updateAddCatBtn() {
+    const cat = getCatInfo(_addCatValue);
+    const emojiEl = document.getElementById('add-cat-emoji');
+    const labelEl = document.getElementById('add-cat-label');
+    const btnEl = document.getElementById('add-cat-btn');
+    if (!emojiEl) return;
+    emojiEl.textContent = cat.emoji;
+    labelEl.textContent = _addCatValue ? tr(cat.labelKey) : tr('passwords.cat.none');
+    btnEl.dataset.cat = _addCatValue;
 }
 
 function generatePasswordForEdit() {
@@ -2614,6 +2941,7 @@ function savePasswordEdit() {
     formData.append('index', currentEditIndex);
     formData.append('name', name);
     formData.append('password', password);
+    formData.append('category', _editCatValue);
     
     makeAuthenticatedRequest('/api/passwords/update', { method: 'POST', body: new URLSearchParams(formData) })
         .then(response => {
@@ -2905,20 +3233,159 @@ document.getElementById('import-passwords-btn').addEventListener('click', (e) =>
 document.getElementById('import-passwords-file').addEventListener('change', (e) => { if(e.target.files.length > 0) showPasswordModal('import-passwords', e.target.files[0]); });
 // --- END of MODIFIED Logic ---
 
+// ── Category popup ────────────────────────────────────────────
+let _catPopupEl = null;
+let _catPopupCallback = null;
+let _catPopupAnchor = null;
+
+function openCatPopup(event, anchorEl, callback) {
+    event.stopPropagation();
+    // Toggle: same button clicked again → just close
+    if (_catPopupEl && _catPopupAnchor === anchorEl) {
+        closeCatPopup();
+        return;
+    }
+    closeCatPopup();
+    _catPopupAnchor = anchorEl;
+    
+    const currentCat = anchorEl.dataset.cat || '';
+    const popup = document.createElement('div');
+    popup.className = 'cat-popup';
+    popup.id = 'cat-popup-el';
+    
+    CATEGORIES.forEach(cat => {
+        const label = cat.id ? tr(cat.labelKey) : tr('passwords.cat.all');
+        const isSelected = cat.id !== '' && cat.id === currentCat;
+        const item = document.createElement('div');
+        item.className = 'cat-popup-item' + (isSelected ? ' selected' : '');
+        item.innerHTML = `<span class="cat-emoji">${cat.emoji}</span>${label}`;
+        item.onclick = (e) => {
+            e.stopPropagation();
+            if (callback) {
+                callback(cat.id);
+            } else {
+                // Quick-change: update badge in table, save immediately
+                const idx = parseInt(anchorEl.closest('[data-pwd-index]')?.dataset.pwdIndex ?? '-1');
+                if (idx >= 0) quickUpdateCategory(idx, cat.id, anchorEl);
+            }
+            closeCatPopup();
+        };
+        popup.appendChild(item);
+    });
+    
+    document.body.appendChild(popup);
+    _catPopupEl = popup;
+    
+    // Position near anchor
+    const rect = anchorEl.getBoundingClientRect();
+    const scrollY = window.scrollY;
+    let top = rect.bottom + scrollY + 4;
+    let left = rect.left;
+    popup.style.top = top + 'px';
+    popup.style.left = left + 'px';
+    
+    // Keep in viewport
+    requestAnimationFrame(() => {
+        const pw = popup.offsetWidth;
+        const vw = window.innerWidth;
+        if (left + pw > vw - 8) popup.style.left = (vw - pw - 8) + 'px';
+    });
+    
+    setTimeout(() => document.addEventListener('click', closeCatPopup, { once: true }), 0);
+}
+
+function closeCatPopup() {
+    if (_catPopupEl) { _catPopupEl.remove(); _catPopupEl = null; }
+    _catPopupAnchor = null;
+}
+
+async function quickUpdateCategory(pwdIndex, newCat, badgeEl) {
+    const pwd = passwordsData[pwdIndex];
+    if (!pwd) return;
+    
+    // Optimistic UI update
+    pwd.category = newCat;
+    const newBadge = document.querySelector('[data-pwd-index="' + pwdIndex + '"] .badge-category');
+    if (newBadge) newBadge.outerHTML = catBadgeHTML(newCat, true);
+    
+    // Send update using same method as savePasswordEdit
+    const formData = new FormData();
+    formData.append('index', pwdIndex);
+    formData.append('name', pwd.name || '');
+    formData.append('password', pwd.password || '');
+    formData.append('category', newCat);
+    
+    try {
+        await makeAuthenticatedRequest('/api/passwords/update', {
+            method: 'POST',
+            body: new URLSearchParams(formData)
+        });
+        CacheManager.invalidate('passwords_list');
+    } catch(e) {
+        showStatus(tr('error') || 'Error saving', true);
+        fetchPasswords();
+    }
+}
+
+
+// ── Category filter bar ───────────────────────────────────────
+function renderCategoryFilterBar(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.innerHTML = '';
+    const bar = document.createElement('div');
+    bar.className = 'cat-filter-bar';
+    
+    CATEGORIES.forEach(cat => {
+        const label = cat.id === '' ? tr('passwords.cat.all') : tr(cat.labelKey);
+        const isActive = (activeCategoryFilter === cat.id);
+        const btn = document.createElement('button');
+        btn.className = 'cat-filter-btn' + (isActive ? ' active' : '');
+        btn.type = 'button';
+        btn.innerHTML = `<span class="cat-emoji">${cat.emoji}</span><span>${label}</span>`;
+        btn.onclick = () => {
+            activeCategoryFilter = cat.id;
+            renderCategoryFilterBar(containerId);
+            fetchPasswords();
+        };
+        bar.appendChild(btn);
+    });
+    
+    container.appendChild(bar);
+}
+
+// ─────────────────────────────────────────────────────────────
+
 function fetchPasswords(){
+    // Render category filter bar
+    renderCategoryFilterBar('cat-filter-container');
+    
     // ⚡ CACHE: Проверяем кеш для списка паролей
     const cachedPasswords = CacheManager.get('passwords_list');
     if (cachedPasswords) {
         console.log('⚡ Using cached passwords list');
         passwordsData = cachedPasswords;
+        
+        // Filter by active category
+        const visiblePasswords = (activeCategoryFilter === '')
+            ? cachedPasswords
+            : cachedPasswords.filter(p => (p.category || '') === activeCategoryFilter);
+        
         const tbody = document.querySelector('#passwords-table tbody');
         tbody.innerHTML = '';
-        cachedPasswords.forEach((password, index) => {
+        visiblePasswords.forEach((password, visibleIndex) => {
+            // Find original index in full passwordsData array
+            const originalIndex = cachedPasswords.indexOf(password);
+            
             const row = tbody.insertRow();
             row.className = 'draggable-row';
             row.draggable = true;
-            row.dataset.index = index;
-            row.innerHTML = '<td><span class="drag-handle">::</span></td><td>' + password.name + '</td><td><button class="button-copy user-activity" onclick="copyPassword(' + index + ')">' + tr('passwords.btn.copy') + '</button><button class="button-action user-activity" onclick="editPassword(' + index + ')">' + tr('passwords.btn.edit') + '</button><button class="button-delete user-activity" onclick="removePassword(' + index + ')">' + tr('passwords.btn.remove') + '</button></td>';
+            row.dataset.pwdIndex = originalIndex;
+            row.dataset.index = originalIndex;
+            row.innerHTML = '<td><span class="drag-handle">::</span></td><td>' + 
+                            catBadgeHTML(password.category || '', true) + 
+                            '<br>' + password.name + formatPasswordMetadata(password, cachedPasswords) + 
+                            '</td><td><button class="button-copy user-activity" onclick="copyPassword(' + originalIndex + ')">' + tr('passwords.btn.copy') + '</button><button class="button-action user-activity" onclick="editPassword(' + originalIndex + ')">' + tr('passwords.btn.edit') + '</button><button class="button-delete user-activity" onclick="removePassword(' + originalIndex + ')">' + tr('passwords.btn.remove') + '</button></td>';
         });
         initializeDragAndDrop('passwords-table', 'passwords');
         return; // Используем кеш, не запрашиваем сервер
@@ -2953,20 +3420,40 @@ function fetchPasswords(){
             data = originalData;
         }
         
-        // ⚡ MEMORY: Храним только имена (пароли не нужны в памяти)
-        passwordsData = data.map(pwd => ({ name: pwd.name }));
+        // ⚡ MEMORY: Храним все поля включая category
+        passwordsData = data.map(pwd => ({
+            name: pwd.name,
+            strength: pwd.strength,
+            pw_hash: pwd.pw_hash,
+            password: pwd.password,
+            category: pwd.category || '',
+            username: pwd.username || '',
+            url: pwd.url || ''
+        }));
         
-        // ⚡ CACHE: Сохраняем только имена паролей (без самих паролей!)
+        // ⚡ CACHE: Сохраняем данные паролей
         CacheManager.set('passwords_list', passwordsData);
+        
+        // Filter by active category
+        const visiblePasswords = (activeCategoryFilter === '')
+            ? passwordsData
+            : passwordsData.filter(p => (p.category || '') === activeCategoryFilter);
         
         const tbody = document.querySelector('#passwords-table tbody');
         tbody.innerHTML = '';
-        passwordsData.forEach((password, index) => {
+        visiblePasswords.forEach((password, visibleIndex) => {
+            // Find original index in full passwordsData array
+            const originalIndex = passwordsData.indexOf(password);
+            
             const row = tbody.insertRow();
             row.className = 'draggable-row';
             row.draggable = true;
-            row.dataset.index = index;
-            row.innerHTML = '<td><span class="drag-handle">::</span></td><td>' + password.name + '</td><td><button class="button-copy user-activity" onclick="copyPassword(' + index + ')">' + tr('passwords.btn.copy') + '</button><button class="button-action user-activity" onclick="editPassword(' + index + ')">' + tr('passwords.btn.edit') + '</button><button class="button-delete user-activity" onclick="removePassword(' + index + ')">' + tr('passwords.btn.remove') + '</button></td>';
+            row.dataset.pwdIndex = originalIndex;
+            row.dataset.index = originalIndex;
+            row.innerHTML = '<td><span class="drag-handle">::</span></td><td>' + 
+                            catBadgeHTML(password.category || '', true) + 
+                            '<br>' + password.name + formatPasswordMetadata(data[originalIndex], data) + 
+                            '</td><td><button class="button-copy user-activity" onclick="copyPassword(' + originalIndex + ')">' + tr('passwords.btn.copy') + '</button><button class="button-action user-activity" onclick="editPassword(' + originalIndex + ')">' + tr('passwords.btn.edit') + '</button><button class="button-delete user-activity" onclick="removePassword(' + originalIndex + ')">' + tr('passwords.btn.remove') + '</button></td>';
         });
         initializeDragAndDrop('passwords-table', 'passwords');
     })
@@ -2975,7 +3462,26 @@ function fetchPasswords(){
         showStatus('Error fetching passwords.', true);
     });
 }
-document.getElementById('add-password-form').addEventListener('submit',function(e){e.preventDefault();const name=document.getElementById('password-name').value;const password=document.getElementById('password-value').value;const formData=new FormData();formData.append('name',name);formData.append('password',password);makeAuthenticatedRequest('/api/passwords/add',{method:'POST',body:formData}).then(data=>{CacheManager.invalidate('passwords_list');showStatus(tr('passwords.added'));fetchPasswords();this.reset()}).catch(err=>showStatus('Error: '+err,true))});
+document.getElementById('add-password-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const name = document.getElementById('password-name').value;
+    const password = document.getElementById('password-value').value;
+    const formData = new FormData();
+    formData.append('name', name);
+    formData.append('password', password);
+    formData.append('category', _addCatValue);
+    
+    makeAuthenticatedRequest('/api/passwords/add', {method: 'POST', body: formData})
+        .then(data => {
+            CacheManager.invalidate('passwords_list');
+            showStatus(tr('passwords.added'));
+            fetchPasswords();
+            this.reset();
+            _addCatValue = '';
+            updateAddCatBtn();
+        })
+        .catch(err => showStatus('Error: ' + err, true));
+});
 function removePassword(index){if(!confirm('Are you sure?'))return;const formData=new FormData();formData.append('index',index);makeAuthenticatedRequest('/api/passwords/delete',{method:'POST',body:formData}).then(data=>{CacheManager.invalidate('passwords_list');showStatus(tr('passwords.removed'));fetchPasswords()}).catch(err=>showStatus('Error: '+err,true))};
 
 async function copyPassword(index) {
@@ -3147,13 +3653,16 @@ async function fetchThemeSettings(){
         showStatus('Error fetching theme settings.',true)
     }
 }
-async function fetchDisplaySettings(){try{const response=await makeEncryptedRequest('/api/display_settings');const data=await response.json();document.getElementById('display-timeout').value=data.display_timeout;if(document.getElementById('auto-lock-timeout'))document.getElementById('auto-lock-timeout').value=data.auto_lock_timeout||0;const splashResponse=await makeEncryptedRequest('/api/splash/mode');if(splashResponse.ok){const splashData=await splashResponse.json();const selectElement=document.getElementById('splash-mode-select');if(selectElement)selectElement.value=splashData.mode}const clockResponse=await makeEncryptedRequest('/api/clock_settings');if(clockResponse.ok){const clockData=await clockResponse.json();const tzSelect=document.getElementById('timezone-select');if(tzSelect&&clockData.timezone)tzSelect.value=clockData.timezone}await loadRtcStatus()}catch(err){showStatus('Error fetching display settings.',true)}}
+async function fetchDisplaySettings(){try{const response=await makeEncryptedRequest('/api/display_settings');const data=await response.json();document.getElementById('display-timeout').value=data.display_timeout;if(document.getElementById('auto-lock-timeout'))document.getElementById('auto-lock-timeout').value=data.auto_lock_timeout||0;if(document.getElementById('dim-timeout'))document.getElementById('dim-timeout').value=data.dim_timeout||0;const splashResponse=await makeEncryptedRequest('/api/splash/mode');if(splashResponse.ok){const splashData=await splashResponse.json();const selectElement=document.getElementById('splash-mode-select');if(selectElement)selectElement.value=splashData.mode}const clockResponse=await makeEncryptedRequest('/api/clock_settings');if(clockResponse.ok){const clockData=await clockResponse.json();const tzSelect=document.getElementById('timezone-select');if(tzSelect&&clockData.timezone)tzSelect.value=clockData.timezone}await loadRtcStatus();await loadDisplayRotation();await updateDeviceBlePinLabels()}catch(err){showStatus('Error fetching display settings.',true)}}
 async function loadBootMode(){try{const response=await makeEncryptedRequest('/api/boot-mode');if(!response.ok)return;const data=await response.json();const selectEl=document.getElementById('boot-mode-select');if(selectEl&&data.boot_mode)selectEl.value=data.boot_mode}catch(err){console.warn('Boot mode load failed',err)}}
 async function loadHidMode(){const section=document.getElementById('hid-mode-section');if(!section)return;try{const response=await makeEncryptedRequest('/api/hid-mode');if(!response.ok)return;const data=await response.json();const sel=document.getElementById('hid-mode-select');if(sel&&data.hid_mode)sel.value=data.hid_mode;section.style.display=''}catch(err){console.warn('loadHidMode failed',err)}}
+async function loadDisplayRotation(){try{const response=await makeEncryptedRequest('/api/display/rotation');if(!response.ok)return;const data=await response.json();const sel=document.getElementById('display-rotation');if(sel&&data.rotation!==undefined)sel.value=String(data.rotation)}catch(err){console.warn('loadDisplayRotation failed',err)}}
+async function saveDisplayRotation(value){try{await makeEncryptedRequest('/api/display/rotation',{method:'POST',body:JSON.stringify({rotation:parseInt(value)}),headers:{'Content-Type':'application/json'}})}catch(err){console.error('saveDisplayRotation:',err)}}
+async function updateDeviceBlePinLabels(){try{const hidStrings={'en':{'pin.device.title':'Device HID PIN','pin.device.notice':'This PIN is required on the hardware device when transmitting passwords via HID (USB or BLE).','pin.device.label.enable':'Enable Device HID PIN','pin.device.desc':'Require PIN on device for HID (USB/BLE) password transmission','pin.device.label.new':'New Device HID PIN (6 digits):','pin.device.label.confirm':'Confirm Device HID PIN:','pin.device.important':'This PIN will be required on the device screen when transmitting passwords via HID (USB or BLE).','pin.device.btn':'Save Device HID PIN','pin.device.saved':'Device HID PIN updated!','pin.device.disabled':'Device HID PIN disabled','pin.device.error.enable':'Please enable Device HID PIN first','pin.device.error.digits':'Device HID PIN must be exactly 6 digits!','pin.device.error.match':'Device HID PINs do not match!'},'ru':{'pin.device.title':'PIN устройства HID','pin.device.notice':'Этот PIN требуется на аппаратном устройстве при передаче паролей через HID (USB или BLE).','pin.device.label.enable':'Включить PIN устройства HID','pin.device.desc':'Требовать PIN на устройстве для передачи паролей через HID (USB/BLE)','pin.device.label.new':'Новый PIN устройства HID (6 цифр):','pin.device.label.confirm':'Подтвердите PIN устройства HID:','pin.device.important':'Этот PIN будет требоваться на экране устройства при передаче паролей через HID (USB или BLE).','pin.device.btn':'Сохранить PIN устройства HID','pin.device.saved':'PIN устройства HID обновлён!','pin.device.disabled':'PIN устройства HID отключён','pin.device.error.enable':'Сначала включите PIN устройства HID','pin.device.error.digits':'PIN устройства HID должен быть ровно 6 цифр!','pin.device.error.match':'PIN устройства HID не совпадают!'},'de':{'pin.device.title':'Geräte-HID-PIN','pin.device.notice':'Dieser PIN wird auf dem Gerät beim Übertragen von Passwörtern über HID (USB oder BLE) benötigt.','pin.device.label.enable':'Geräte-HID-PIN aktivieren','pin.device.desc':'PIN auf dem Gerät für HID-Passwortübertragung (USB/BLE) erforderlich','pin.device.label.new':'Neuer Geräte-HID-PIN (6 Ziffern):','pin.device.label.confirm':'Geräte-HID-PIN bestätigen:','pin.device.important':'Dieser PIN wird auf dem Gerät beim Übertragen von Passwörtern über HID (USB oder BLE) benötigt.','pin.device.btn':'Geräte-HID-PIN speichern','pin.device.saved':'Geräte-HID-PIN aktualisiert!','pin.device.disabled':'Geräte-HID-PIN deaktiviert','pin.device.error.enable':'Bitte zuerst Geräte-HID-PIN aktivieren','pin.device.error.digits':'Geräte-HID-PIN muss genau 6 Ziffern haben!','pin.device.error.match':'Geräte-HID-PINs stimmen nicht überein!'},'zh':{'pin.device.title':'设备HID PIN','pin.device.notice':'通过HID（USB或BLE）传输密码时需要在硬件设备上输入此PIN。','pin.device.label.enable':'启用设备HID PIN','pin.device.desc':'通过HID（USB/BLE）传输密码时需要在设备上输入PIN','pin.device.label.new':'新设备HID PIN（6位数字）：','pin.device.label.confirm':'确认设备HID PIN：','pin.device.important':'通过HID（USB或BLE）传输密码时需要在设备屏幕上输入此PIN。','pin.device.btn':'保存设备HID PIN','pin.device.saved':'设备HID PIN已更新！','pin.device.disabled':'设备HID PIN已禁用','pin.device.error.enable':'请先启用设备HID PIN','pin.device.error.digits':'设备HID PIN必须恰好6位数字！','pin.device.error.match':'设备HID PIN不匹配！'},'es':{'pin.device.title':'PIN de dispositivo HID','pin.device.notice':'Este PIN es requerido en el dispositivo al transmitir contraseñas vía HID (USB o BLE).','pin.device.label.enable':'Habilitar PIN de dispositivo HID','pin.device.desc':'Requerir PIN en el dispositivo para transmisión de contraseñas HID (USB/BLE)','pin.device.label.new':'Nuevo PIN de dispositivo HID (6 dígitos):','pin.device.label.confirm':'Confirmar PIN de dispositivo HID:','pin.device.important':'Este PIN será requerido en la pantalla del dispositivo al transmitir contraseñas vía HID (USB o BLE).','pin.device.btn':'Guardar PIN de dispositivo HID','pin.device.saved':'¡PIN de dispositivo HID actualizado!','pin.device.disabled':'PIN de dispositivo HID deshabilitado','pin.device.error.enable':'Por favor habilite el PIN de dispositivo HID primero','pin.device.error.digits':'¡El PIN de dispositivo HID debe tener exactamente 6 dígitos!','pin.device.error.match':'¡Los PINs de dispositivo HID no coinciden!'}};Object.keys(hidStrings).forEach(lang=>{if(i18n[lang])Object.assign(i18n[lang],hidStrings[lang]);});const rotationStrings={'en':{'display.rotation.title':'Display Orientation','display.rotation.label':'Screen orientation:','display.rotation.normal':'Normal (landscape)','display.rotation.flipped':'Flipped (180°)'},'ru':{'display.rotation.title':'Ориентация экрана','display.rotation.label':'Ориентация экрана:','display.rotation.normal':'Обычная (горизонтально)','display.rotation.flipped':'Перевёрнутая (180°)'},'de':{'display.rotation.title':'Bildschirmausrichtung','display.rotation.label':'Bildschirmausrichtung:','display.rotation.normal':'Normal (Querformat)','display.rotation.flipped':'Gedreht (180°)'},'zh':{'display.rotation.title':'屏幕方向','display.rotation.label':'屏幕方向：','display.rotation.normal':'正常（横向）','display.rotation.flipped':'翻转（180°）'},'es':{'display.rotation.title':'Orientación de pantalla','display.rotation.label':'Orientación de pantalla:','display.rotation.normal':'Normal (horizontal)','display.rotation.flipped':'Invertida (180°)'}};Object.keys(rotationStrings).forEach(lang=>{if(i18n[lang])Object.assign(i18n[lang],rotationStrings[lang]);});applyLang(currentLang);}catch(e){}}
 document.getElementById('save-hid-mode-btn').addEventListener('click',async function(){this.disabled=true;this.textContent=tr('settings.hid.saving');try{const mode=document.getElementById('hid-mode-select').value;const response=await makeEncryptedRequest('/api/hid-mode',{method:'POST',body:JSON.stringify({hid_mode:mode}),headers:{'Content-Type':'application/json'}});const data=await response.json();showStatus(data.success?tr('settings.hid.saved'):tr('settings.hid.error'),!data.success)}catch(err){showStatus('Error: '+err,true)}finally{this.disabled=false;this.textContent=tr('settings.hid.btn')}});
 document.getElementById('save-boot-mode-btn').addEventListener('click',async function(){this.disabled=true;this.textContent=tr('settings.boot.saving');try{const mode=document.getElementById('boot-mode-select').value;const response=await makeEncryptedRequest('/api/boot-mode',{method:'POST',body:JSON.stringify({boot_mode:mode}),headers:{'Content-Type':'application/json'}});if(response.ok){const data=await response.json();showStatus(data.success?tr('settings.boot.saved'):'Error saving boot mode',!data.success)}else{showStatus('Error saving boot mode',true)}}catch(err){showStatus('Error: '+err.message,true)}finally{this.disabled=false;this.textContent=tr('settings.boot.btn')}});
 document.getElementById('theme-selection-form').addEventListener('submit',function(e){e.preventDefault();const selectedTheme=document.querySelector('input[name="theme"]:checked').value;const formData=new FormData();formData.append('theme',selectedTheme);makeEncryptedRequest('/api/theme',{method:'POST',body:new URLSearchParams(formData)}).then(res=>res.json()).then(data=>{CacheManager.invalidate('theme_settings');if(data.success){showStatus(tr('display.theme.saved'))}else{showStatus(data.message||'Error applying theme',true)}}).catch(err=>showStatus('Error applying theme: '+err,true))});
-(function(){const AL_ORDER=[0,300,900,1800,3600,14400];function enforceAutoLock(){const t=parseInt(document.getElementById('display-timeout').value);const alSel=document.getElementById('auto-lock-timeout');const al=parseInt(alSel.value);if(t>0&&al>0&&al<=t){const next=AL_ORDER.find(function(v){return v>t});alSel.value=next!==undefined?String(next):'0';}};document.getElementById('display-timeout').addEventListener('change',enforceAutoLock);document.getElementById('display-timeout-form').addEventListener('submit',function(e){e.preventDefault();const timeout=parseInt(document.getElementById('display-timeout').value);const autoLock=parseInt(document.getElementById('auto-lock-timeout').value);if(timeout>0&&autoLock>0&&autoLock<=timeout){showStatus(tr('display.lock.error.order'),true);return;}const formData=new FormData();formData.append('display_timeout',timeout);formData.append('auto_lock_timeout',autoLock);makeEncryptedRequest('/api/display_settings',{method:'POST',body:new URLSearchParams(formData)}).then(res=>res.json()).then(data=>{if(data.success){showStatus(tr('display.lock.saved'))}else{showStatus(data.message||'Error saving settings',true)}}).catch(err=>showStatus('Error saving display settings: '+err,true));});})();
+(function(){const AL_ORDER=[0,300,900,1800,3600,14400];const DIM_ORDER=[0,5,10,15,30,60,300];function enforceLadder(){const dimSel=document.getElementById('dim-timeout');const dspSel=document.getElementById('display-timeout');const alSel=document.getElementById('auto-lock-timeout');let dim=parseInt(dimSel.value);let dsp=parseInt(dspSel.value);let al=parseInt(alSel.value);if(dim>0&&dsp>0&&dim>=dsp){const next=DIM_ORDER.slice().reverse().find(function(v){return v<dsp&&v>0});dimSel.value=next!==undefined?String(next):'0';dim=parseInt(dimSel.value);}if(dsp>0&&al>0&&al<=dsp){const next=AL_ORDER.find(function(v){return v>dsp});alSel.value=next!==undefined?String(next):'0';al=parseInt(alSel.value);}if(dim>0&&al>0&&dim>=al){const next=DIM_ORDER.slice().reverse().find(function(v){return v<al&&v>0});dimSel.value=next!==undefined?String(next):'0';}};document.getElementById('dim-timeout').addEventListener('change',enforceLadder);document.getElementById('display-timeout').addEventListener('change',enforceLadder);document.getElementById('auto-lock-timeout').addEventListener('change',enforceLadder);document.getElementById('display-timeout-form').addEventListener('submit',function(e){e.preventDefault();const dimTimeout=parseInt(document.getElementById('dim-timeout').value);const timeout=parseInt(document.getElementById('display-timeout').value);const autoLock=parseInt(document.getElementById('auto-lock-timeout').value);if(dimTimeout>0&&timeout>0&&dimTimeout>=timeout){showStatus('Dim timeout must be less than screen timeout!',true);return;}if(timeout>0&&autoLock>0&&autoLock<=timeout){showStatus(tr('display.lock.error.order'),true);return;}if(dimTimeout>0&&autoLock>0&&dimTimeout>=autoLock){showStatus('Dim timeout must be less than auto lock timeout!',true);return;}const formData=new FormData();formData.append('dim_timeout',dimTimeout);formData.append('display_timeout',timeout);formData.append('auto_lock_timeout',autoLock);makeEncryptedRequest('/api/display_settings',{method:'POST',body:new URLSearchParams(formData)}).then(res=>res.json()).then(data=>{if(data.success){showStatus(tr('display.lock.saved'))}else{showStatus(data.message||'Error saving settings',true)}}).catch(err=>showStatus('Error saving display settings: '+err,true));});})();
 document.getElementById('save-timezone-btn').addEventListener('click',async function(){const tzSelect=document.getElementById('timezone-select');if(!tzSelect||!tzSelect.value){showStatus(tr('display.clock.tz.select'),true);return}const formData=new FormData();formData.append('timezone',tzSelect.value);const response=await makeEncryptedRequest('/api/clock_settings',{method:'POST',body:new URLSearchParams(formData)});if(response.ok){const data=await response.json();showStatus(data.success?tr('display.clock.tz.saved'):(data.message||'Error saving timezone'),!data.success)}else{showStatus('Error saving timezone',true)}});
 document.getElementById('save-splash-mode-btn').addEventListener('click',async function(){const selectElement=document.getElementById('splash-mode-select');if(!selectElement||!selectElement.value){showStatus(tr('display.splash.select'),true);return}const formData=new FormData();formData.append('mode',selectElement.value);try{const response=await makeEncryptedRequest('/api/splash/mode',{method:'POST',body:formData});if(response.ok){const data=await response.json();showStatus(data.success?tr('display.splash.saved'):'Error saving splash mode')}else{const text=await response.text();showStatus('Error: '+text,true)}}catch(err){showStatus('Error saving splash mode: '+err.message,true)}});
 async function loadRtcStatus(){try{const response=await makeEncryptedRequest('/api/rtc');if(!response.ok)return;const data=await response.json();const enabledEl=document.getElementById('rtc-enabled');if(!enabledEl)return;enabledEl.checked=!!data.enabled;const defaultSda=data.default_sda||21;const defaultScl=data.default_scl||22;document.getElementById('rtc-sda').value=data.sda_pin||defaultSda;document.getElementById('rtc-scl').value=data.scl_pin||defaultScl;const boardNote=document.getElementById('rtc-board-note');if(boardNote){boardNote.textContent=(data.board?data.board+' — ':'')+'Default: SDA='+defaultSda+', SCL='+defaultScl;}document.getElementById('rtc-pin-config').style.display=data.enabled?'block':'none';const badge=document.getElementById('rtc-status-badge');const timeDisplay=document.getElementById('rtc-time-display');const statusRow=document.getElementById('rtc-status-row');if(data.enabled){statusRow.style.display='flex';if(!data.available){badge.style.background='#e74c3c';badge.textContent=tr('display.rtc.status.notfound');timeDisplay.textContent=tr('display.rtc.status.check')}else{const rtcTs=data.rtc_time?Math.floor(new Date(data.rtc_time).getTime()/1000):0;const drift=Math.abs(rtcTs-Math.floor(Date.now()/1000));if(drift>3600){badge.style.background='#f39c12';badge.textContent=tr('display.rtc.status.drifted');timeDisplay.textContent=data.rtc_time?new Date(data.rtc_time).toLocaleString([],{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}):''}else{badge.style.background='#27ae60';badge.textContent=tr('display.rtc.status.ok');timeDisplay.textContent=data.rtc_time?new Date(data.rtc_time).toLocaleString([],{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}):''}}}else{statusRow.style.display='none'}document.getElementById('rtc-sync-hint').textContent=data.wifi_connected?tr('display.rtc.hint.ntp'):tr('display.rtc.hint.browser')}catch(err){console.warn('RTC status load failed',err)}}
@@ -3168,9 +3677,20 @@ async function fetchPinSettings(){
         document.getElementById('pin-enabled-device').checked = cachedPin.enabledForDevice;
         
         // Загружаем Device BLE PIN status
+        if (cachedPin.length && cachedPin.length >= 4 && cachedPin.length <= 10) {
+            devicePinLength = cachedPin.length;
+            var dp = document.getElementById('duress-pin');
+            var dpc = document.getElementById('duress-pin-confirm');
+            if (dp)  { dp.maxLength = devicePinLength; dp.pattern = '\\d{' + devicePinLength + '}'; }
+            if (dpc) { dpc.maxLength = devicePinLength; dpc.pattern = '\\d{' + devicePinLength + '}'; }
+        }
         if (cachedPin.deviceBlePinEnabled !== undefined) {
             document.getElementById('device-ble-pin-enabled').checked = cachedPin.deviceBlePinEnabled;
             toggleDeviceBlePinFields(); // Показываем/скрываем поля
+        }
+        if (cachedPin.duressPinEnabled !== undefined) {
+            document.getElementById('duress-pin-enabled').checked = cachedPin.duressPinEnabled;
+            toggleDuresspinFields();
         }
         
         return;
@@ -3210,15 +3730,32 @@ async function fetchPinSettings(){
         console.log('📌 PIN Settings loaded:', {
             deviceBlePinEnabled: data.deviceBlePinEnabled,
             deviceBlePinConfigured: data.deviceBlePinConfigured,
-            enabledForDevice: data.enabledForDevice
+            enabledForDevice: data.enabledForDevice,
+            has_usb_hid: data.has_usb_hid
         });
+        
+        // 🎯 Если плата поддерживает USB HID, патчим i18n словарь
+        if (data.has_usb_hid) {
+            await updateDeviceBlePinLabels();
+        }
         
         document.getElementById('pin-enabled-device').checked = data.enabledForDevice;
         
         // Загружаем Device BLE PIN status
+        if (data.length && data.length >= 4 && data.length <= 10) {
+            devicePinLength = data.length;
+            var dp = document.getElementById('duress-pin');
+            var dpc = document.getElementById('duress-pin-confirm');
+            if (dp)  { dp.maxLength = devicePinLength; dp.pattern = '\\d{' + devicePinLength + '}'; }
+            if (dpc) { dpc.maxLength = devicePinLength; dpc.pattern = '\\d{' + devicePinLength + '}'; }
+        }
         if (data.deviceBlePinEnabled !== undefined) {
             document.getElementById('device-ble-pin-enabled').checked = data.deviceBlePinEnabled;
             toggleDeviceBlePinFields(); // Показываем/скрываем поля
+        }
+        if (data.duressPinEnabled !== undefined) {
+            document.getElementById('duress-pin-enabled').checked = data.duressPinEnabled;
+            toggleDuresspinFields();
         }
         
     }catch(err){
@@ -3227,6 +3764,40 @@ async function fetchPinSettings(){
 }
 
 // Toggle Device BLE PIN fields visibility
+function toggleDuresspinFields() {
+    var enabled = document.getElementById('duress-pin-enabled').checked;
+    var fields = document.getElementById('duress-pin-fields');
+    if (!fields) return;
+    fields.style.display = enabled ? 'block' : 'none';
+    if (!enabled) {
+        document.getElementById('duress-pin').value = '';
+        document.getElementById('duress-pin-confirm').value = '';
+        var cached = CacheManager.get('pin_settings');
+        if (cached && cached.duressPinConfigured && cached.duressPinEnabled) {
+            var fd = new FormData();
+            fd.append('duress_pin_enabled', 'false');
+            makeEncryptedRequest('/api/duress_pin_update', {method:'POST', body:fd})
+                .then(function(r){return r.json();})
+                .then(function(d){
+                    if (d.success) {
+                        showStatus(tr('pin.duress.disabled'));
+                        CacheManager.invalidate('pin_settings');
+                        fetchPinSettings();
+                    } else {
+                        showStatus(d.message || 'Error disabling Duress PIN', true);
+                        document.getElementById('duress-pin-enabled').checked = true;
+                        fields.style.display = 'block';
+                    }
+                })
+                .catch(function(e) {
+                    showStatus('Error: ' + e, true);
+                    document.getElementById('duress-pin-enabled').checked = true;
+                    fields.style.display = 'block';
+                });
+        }
+    }
+}
+
 function toggleDeviceBlePinFields() {
     const enabled = document.getElementById('device-ble-pin-enabled').checked;
     const fields = document.getElementById('device-ble-pin-fields');
@@ -3386,30 +3957,34 @@ document.getElementById('pincode-settings-form').addEventListener('submit', asyn
     }
 });
 
-// BLE Bonding PIN Management
-document.getElementById('ble-bonding-pin-form').addEventListener('submit',function(e){
+// Device BLE PIN Management
+document.getElementById('duress-pin-form').addEventListener('submit', function(e) {
     e.preventDefault();
-    const blePin=document.getElementById('ble-bonding-pin').value;
-    const blePinConfirm=document.getElementById('ble-bonding-pin-confirm').value;
-    if(blePin.length!==6||!/^\d{6}$/.test(blePin)){
-        showStatus(tr('pin.ble.error.digits'),true);
-        return;
+    var enabled = document.getElementById('duress-pin-enabled').checked;
+    var pin = document.getElementById('duress-pin').value;
+    var pinConfirm = document.getElementById('duress-pin-confirm').value;
+    if (!enabled) { showStatus(tr('pin.duress.error.enable'), true); return; }
+    if (pin.length !== devicePinLength || !/^\d+$/.test(pin)) {
+        showStatus(tr('pin.duress.error.digits'), true); return;
     }
-    if(blePin!==blePinConfirm){
-        showStatus(tr('pin.ble.error.match'),true);
-        return;
-    }
-    const formData=new FormData();
-    formData.append('ble_bonding_pin',blePin);
-    makeEncryptedRequest('/api/ble_pin_update',{method:'POST',body:formData}).then(res=>res.json()).then(data=>{
-        if(data.success){
-            showStatus(tr('pin.ble.saved'));
-            document.getElementById('ble-bonding-pin').value='';
-            document.getElementById('ble-bonding-pin-confirm').value='';
-        }else{
-            showStatus(data.message||'Error updating BLE Bonding PIN',true);
-        }
-    }).catch(err=>showStatus('Error updating BLE Bonding PIN: '+err,true));
+    if (pin !== pinConfirm) { showStatus(tr('pin.duress.error.match'), true); return; }
+    var fd = new FormData();
+    fd.append('duress_pin_enabled', 'true');
+    fd.append('duress_pin', pin);
+    makeEncryptedRequest('/api/duress_pin_update', {method:'POST', body:fd})
+        .then(function(r){return r.json();})
+        .then(function(d){
+            if (d.success) {
+                showStatus(tr('pin.duress.saved'));
+                document.getElementById('duress-pin').value = '';
+                document.getElementById('duress-pin-confirm').value = '';
+                CacheManager.invalidate('pin_settings');
+                fetchPinSettings();
+            } else {
+                showStatus(d.message || 'Error updating Duress PIN', true);
+            }
+        })
+        .catch(function(e){ showStatus('Error: ' + e, true); });
 });
 
 // Device BLE PIN Management
@@ -3465,15 +4040,23 @@ const passwordCriteria = {
     uppercase: { el: document.getElementById('pwd-uppercase'), regex: /[A-Z]/ },
     lowercase: { el: document.getElementById('pwd-lowercase'), regex: /[a-z]/ },
     number: { el: document.getElementById('pwd-number'), regex: /[0-9]/ },
-    special: { el: document.getElementById('pwd-special'), regex: /[!@#$%]/ }
+    special: { el: document.getElementById('pwd-special'), regex: /[!@#$%]/ },
+    noUsername: { el: document.getElementById('pwd-no-username'), test: null }
 };
 
 function validateNewPassword() {
     const password = document.getElementById('new-password').value;
     let allValid = true;
+    const rawUsername = (document.getElementById('current-admin-login')?.textContent || '').trim().toLowerCase();
+    const pwLower = password.toLowerCase();
+    const usernameWords = rawUsername.match(/[a-z]{3,}/g) || [];
+    passwordCriteria.noUsername.test = () =>
+        usernameWords.length === 0 || !usernameWords.some(w => pwLower.includes(w));
+    
     for (const key in passwordCriteria) {
-        const isValid = passwordCriteria[key].regex.test(password);
-        passwordCriteria[key].el.classList.toggle('valid', isValid);
+        const crit = passwordCriteria[key];
+        const isValid = crit.regex ? crit.regex.test(password) : (crit.test ? crit.test() : true);
+        crit.el.classList.toggle('valid', isValid);
         if (!isValid) allValid = false;
     }
     return allValid;
@@ -3788,6 +4371,38 @@ document.getElementById('mdns-settings-form').addEventListener('submit',function
 let keysData = [];
 let passwordsData = [];
 let csrfToken = '';
+
+// ── Category definitions ──────────────────────────────────────
+const CATEGORIES = [
+    { id: '',      emoji: '📋', labelKey: 'passwords.cat.all'   },
+    { id: 'web',   emoji: '🌐', labelKey: 'passwords.cat.web'   },
+    { id: 'app',   emoji: '📱', labelKey: 'passwords.cat.app'   },
+    { id: 'local', emoji: '🖥',  labelKey: 'passwords.cat.local' },
+    { id: 'key',   emoji: '🔑', labelKey: 'passwords.cat.key'   },
+];
+
+function getCatInfo(catId) {
+    return CATEGORIES.find(c => c.id === (catId || '')) || CATEGORIES[0];
+}
+
+function getCatBadgeClass(catId) {
+    const map = { web: 'badge-cat-web', app: 'badge-cat-app',
+                  local: 'badge-cat-local', key: 'badge-cat-key' };
+    return map[catId] || 'badge-cat-none';
+}
+
+function catBadgeHTML(catId, clickable = true) {
+    const cat = getCatInfo(catId);
+    const cls = getCatBadgeClass(catId);
+    const label = catId ? tr(cat.labelKey) : tr('passwords.cat.none');
+    const onclick = clickable ? `onclick="openCatPopup(event, this)" data-cat="${catId || ''}"` : '';
+    return `<span class="badge badge-category ${cls}" ${onclick}>${cat.emoji} ${label}</span>`;
+}
+
+// Active category filter state
+let activeCategoryFilter = '';
+
+// ─────────────────────────────────────────────────────────────
 
 // CSRF Token Management
 async function fetchCsrfToken() {
@@ -4130,6 +4745,7 @@ class SecureClient {
             // Display Settings Management
             '/api/theme',             // ✅ GET/POST - тема устройства
             '/api/display_settings',  // ✅ GET/POST - таймаут экрана
+            '/api/display/rotation',  // ✅ GET/POST - ориентация экрана
             '/api/splash/mode',       // ✅ GET/POST - выбор splash экрана
             '/api/clock_settings',    // ✅ GET/POST - настройки часов
             '/api/rtc',               // ✅ GET/POST - DS3231 RTC модуль
@@ -4139,6 +4755,7 @@ class SecureClient {
             // PIN Settings Management
             '/api/pincode_settings',  // ✅ GET/POST - настройки PIN
             '/api/ble_pin_update',    // ✅ POST - BLE PIN обновление
+        '/api/duress_pin_update', // ✅ POST - Duress PIN update
             '/api/clear_ble_clients', // ✅ POST - очистка BLE клиентов
             // Device Settings Management
             '/api/config',            // ✅ GET - конфигурация сервера (timeout)
@@ -4192,7 +4809,7 @@ class SecureClient {
         
         // B) Fake Headers Injection - добавление ложных заголовков
         const fakeHeaders = {
-            'X-Browser-Engine': 'Mozilla/5.0 (compatible; MSIE 10.0)',
+            'X-Browser-Engine': 'Blink/537.36',
             'X-Request-Time': Date.now().toString(),
             'X-Client-Version': '2.4.1-stable',
             'X-Feature-Flags': 'analytics,tracking,ads',
@@ -4237,13 +4854,14 @@ class SecureClient {
         
         // 📉 Убран DEBUG лог - повторяется на каждый запрос
         
-        // D) Header Payload Embedding - встраивание метаданных в User-Agent
-        const metadata = {
-            endpoint: endpoint,
-            method: method,
-            ts: Date.now()
+        // D) Header Payload Embedding - embed random noise (not real endpoint/method)
+        // Real metadata must never appear here — it would defeat URL obfuscation and method tunneling
+        const fakeMetadata = {
+            sid: generateRandomToken(16, 'hex'),
+            v: Math.floor(Math.random() * 900 + 100),
+            ts: Date.now() - Math.floor(Math.random() * 60000)
         };
-        const encodedData = btoa(JSON.stringify(metadata));
+        const encodedData = btoa(JSON.stringify(fakeMetadata));
         const baseUserAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
         obfuscatedHeaders['User-Agent'] = `${baseUserAgent} (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36 EdgeInsight/${encodedData}`;
         this.headerObfuscationStats.payloadEmbedded++;
@@ -4285,6 +4903,7 @@ class SecureClient {
             '/api/passwords/import',
             '/api/pincode_settings',   // 🔐 PIN settings (security configuration)
             '/api/ble_pin_update',     // 🔐 BLE PIN update (security sensitive)
+        '/api/duress_pin_update',  // 🔐 Duress PIN update (critical security)
             '/api/settings',           // 🔐 Device settings (admin login info)
             '/api/ble_settings',       // 🔐 BLE device name configuration
             '/api/mdns_settings',      // 🔐 mDNS hostname configuration
@@ -4300,6 +4919,7 @@ class SecureClient {
             '/api/reboot_with_web',    // 🔐 System reboot with web server (critical!)
             '/api/theme',              // 🔐 Display theme settings (NEW)
             '/api/display_settings',   // 🔐 Display timeout settings (NEW)
+            '/api/display/rotation',   // 🔐 Display rotation settings (NEW)
             '/api/splash/mode',        // 🔐 Splash screen selection (NEW)
             '/api/clock_settings',     // 🔐 Clock display settings (NEW)
             '/api/rtc',                // 🔐 DS3231 RTC module (NEW)
@@ -4847,6 +5467,14 @@ function reorderItems(dataType, fromIndex, toIndex) {
     } else if (dataType === 'passwords') {
         const item = passwordsData.splice(fromIndex, 1)[0];
         passwordsData.splice(toIndex, 0, item);
+        
+        const pwdTbody = document.querySelector('#passwords-table tbody');
+        if (pwdTbody) {
+            [...pwdTbody.querySelectorAll('.draggable-row')].forEach((row, i) => {
+                row.dataset.index = i;
+            });
+        }
+        
         // Send update to server (includes localStorage backup)
         savePasswordsOrder();
     }
@@ -4880,7 +5508,6 @@ function savePasswordsOrder() {
     }).then(res => {
         if (res.ok) {
             CacheManager.invalidate('passwords_list'); // ♻️ Инвалидация кеша
-            fetchPasswords();
             showStatus(tr('passwords.order.saved'));
         } else {
             showStatus(tr('passwords.order.failed'), true);
@@ -4891,7 +5518,7 @@ function savePasswordsOrder() {
     });
 }
 
-const i18n={ru:{"app.title":"Панель управления","tab.keys":"Ключи","tab.passwords":"Пароли","tab.display":"Экран","tab.pin":"PIN","tab.settings":"Настройки","keys.title":"Управление ключами","keys.add.title":"Добавить ключ","keys.add.btn":"Добавить ключ","keys.current.title":"Текущие ключи","keys.importexport.title":"Импорт/Экспорт ключей","keys.advanced":"Расширенные настройки","keys.hotp.sync":"Счётчики HOTP синхронизируются вместе с TOTP ключами","keys.api.status":"Статус API:","keys.api.inactive":"Неактивен","keys.add.success":"✅ Ключ успешно добавлен!","keys.remove.success":"Ключ удалён!","keys.order.saved":"Порядок ключей сохранён!","keys.api.enabled":"Доступ к API открыт на 5 минут.","keys.hotp.generated":"✅ Код HOTP сгенерирован","keys.copied":"TOTP код скопирован!","keys.hotp_copied":"HOTP код скопирован!","ui.loading":"Загрузка...","keys.col.name":"Имя","keys.col.code":"Код","keys.col.timer":"Таймер","keys.col.progress":"Прогресс","keys.col.actions":"Действия","keys.btn.remove":"Удалить","keys.btn.next":"🔄 След","keys.api.enable":"Включить API (5 мин)","keys.field.name":"Имя:","keys.field.secret":"Секрет (Base32):","keys.field.algorithm":"Алгоритм:","keys.type.totp":"TOTP (на основе времени)","keys.type.hotp":"HOTP (на основе счётчика)","keys.digits.6":"6 цифр","keys.digits.8":"8 цифр","keys.period.30":"30 секунд","keys.period.60":"60 секунд","keys.field.digits":"Цифры:","keys.field.period":"Период:","keys.algo.sha1":"SHA1 (Стандарт)","passwords.title":"Управление паролями","passwords.add.title":"Добавить пароль","passwords.field.name":"Имя:","passwords.field.password":"Пароль:","passwords.add.btn":"Добавить пароль","passwords.current.title":"Текущие пароли","passwords.col.name":"Имя","passwords.col.actions":"Действия","passwords.btn.copy":"Копировать","passwords.btn.edit":"Изменить","passwords.btn.remove":"Удалить","passwords.copied":"Пароль скопирован!","passwords.updated":"Пароль обновлён!","passwords.removed":"Пароль удалён!","passwords.added":"Пароль добавлен!","passwords.order.saved":"Порядок паролей сохранён!","passwords.order.failed":"Ошибка сохранения порядка паролей.","passwords.gen.title":"Генератор паролей","passwords.gen.desc":"Выберите длину и сгенерируйте надёжный пароль","passwords.gen.generated":"Сгенерированный пароль:","passwords.gen.btn.generate":"Сгенерировать","passwords.gen.btn.use":"Использовать пароль","passwords.edit.title":"Редактировать пароль","passwords.edit.desc":"Изменить имя и пароль для этой записи","passwords.edit.name":"Имя:","passwords.edit.password":"Пароль:","passwords.edit.btn.save":"Сохранить","passwords.edit.btn.cancel":"Отмена","passwords.strength.weak":"Слабый пароль","passwords.strength.medium":"Средний пароль","passwords.strength.strong":"Надёжный пароль","passwords.strength.encryption":"Ключ шифрования","passwords.importexport.title":"Импорт/Экспорт паролей","passwords.btn.export":"Экспорт паролей","passwords.btn.import":"Импорт паролей","passwords.gen.length":"Длина пароля:","passwords.modal.confirm":"Подтвердить","passwords.export.title":"Подтверждение экспорта","passwords.export.desc":"Введите пароль администратора для шифрования и экспорта паролей.","passwords.import.title":"Подтверждение импорта","passwords.import.desc":"Введите пароль администратора для расшифровки и импорта паролей.","system.shutdown.desc":"Веб-сервер автоматически отключится из-за неактивности.","system.shutdown.remaining":"Осталось:","display.title":"Настройки экрана","display.theme.saved":"Тема успешно применена!","display.theme.title":"Выбор темы","display.theme.light":"Светлая тема","display.theme.dark":"Тёмная тема","display.theme.btn":"Применить тему","display.splash.title":"Заставка","display.splash.label":"Режим встроенной заставки:","display.splash.disabled":"Отключено (без заставки)","display.splash.btn":"Сохранить","display.splash.saved":"Режим заставки сохранён! Перезагрузите устройство.","display.splash.select":"Выберите режим заставки","display.clock.title":"Настройки часов","display.clock.timezone":"Часовой пояс:","display.clock.save.tz":"Сохранить часовой пояс","display.clock.tz.saved":"Часовой пояс сохранён! Применено немедленно.","display.clock.tz.select":"Выберите часовой пояс","display.rtc.title":"Модуль DS3231 RTC","display.rtc.desc":"Аппаратные часы для офлайн/AP режима","display.rtc.sda":"Пин SDA","display.rtc.scl":"Пин SCL","display.rtc.btn":"Синхронизировать и сохранить","display.rtc.saving":"Сохранение...","display.rtc.saved":"Настройки RTC сохранены","display.rtc.status.notfound":"Не найдено","display.rtc.status.check":"Проверьте пины I2C","display.rtc.status.drifted":"Дрейф времени","display.rtc.status.ok":"ОК","display.rtc.hint.ntp":"Время синхронизируется с NTP при следующей загрузке с WiFi.","display.rtc.hint.browser":"Время синхронизируется с часами браузера при сохранении.","display.lock.title":"Экран и блокировка","display.lock.screen.label":"Тайм-аут экрана (выключить дисплей через):","display.lock.auto.label":"Автоблокировка (глубокий сон + PIN через):","display.lock.warning":"Автоблокировка должна быть длиннее тайм-аута экрана, если оба включены.","display.lock.btn":"Сохранить настройки","display.lock.saved":"Настройки экрана успешно сохранены!","display.lock.error.order":"Тайм-аут автоблокировки должен быть больше тайм-аута экрана!","display.lock.never":"Никогда","display.lock.opt.15s":"15 секунд","display.lock.opt.30s":"30 секунд","display.lock.opt.1m":"1 минута","display.lock.opt.5m":"5 минут","display.lock.opt.15m":"15 минут","display.lock.opt.30m":"30 минут","display.lock.opt.1h":"1 час","display.lock.opt.4h":"4 часа","pin.title":"Настройки PIN-кода","pin.startup.label":"PIN при запуске","pin.startup.desc":"Шифровать ключ устройства с PIN при запуске","pin.startup.btn":"Сохранить настройки PIN","pin.cancelled":"Изменение PIN отменено.","pin.reset.cancelled":"Сброс отменён.","pin.rebooting":"Устройство перезагружается... Подождите.","pin.ble.title":"PIN для BLE-сопряжения","pin.ble.notice":"Этот PIN отображается на экране устройства во время BLE-сопряжения для аутентификации клиента.","pin.ble.label.new":"Новый PIN для BLE (6 цифр):","pin.ble.label.confirm":"Подтвердите PIN для BLE:","pin.ble.important":"Этот PIN будет отображаться на экране ESP32 во время BLE-сопряжения для ввода клиентом.","pin.ble.btn":"Обновить PIN для BLE","pin.ble.saved":"PIN для BLE обновлён! Все BLE-клиенты отключены.","pin.ble.error.digits":"PIN для BLE должен быть ровно 6 цифр!","pin.ble.error.match":"PIN для BLE не совпадают!","pin.placeholder.enter":"Введите 6-значный PIN","pin.placeholder.confirm":"Подтвердите 6-значный PIN","pin.device.title":"PIN устройства BLE","pin.device.notice":"Этот PIN требуется на аппаратном устройстве при передаче паролей через BLE.","pin.device.label.enable":"Включить PIN устройства BLE","pin.device.desc":"Требовать PIN на устройстве для передачи паролей через BLE","pin.device.label.new":"Новый PIN устройства BLE (6 цифр):","pin.device.label.confirm":"Подтвердите PIN устройства BLE:","pin.device.important":"Этот PIN будет требоваться на экране устройства при передаче паролей через BLE.","pin.device.btn":"Сохранить PIN устройства BLE","pin.device.saved":"PIN устройства BLE обновлён!","pin.device.disabled":"PIN устройства BLE отключён","pin.device.error.enable":"Сначала включите PIN устройства BLE","pin.device.error.digits":"PIN устройства BLE должен быть ровно 6 цифр!","pin.device.error.match":"PIN устройства BLE не совпадают!","settings.title":"Настройки устройства","settings.pwd.title":"Управление паролями","settings.pwd.toggle.web":"Веб-кабинет","settings.pwd.toggle.wifi":"Точка доступа WiFi","settings.pwd.web.form.title":"Сменить пароль веб-кабинета","settings.pwd.web.desc":"Сменить пароль для доступа к этому веб-интерфейсу.","settings.pwd.current.login":"Текущий логин:","settings.pwd.web.new.label":"Новый пароль веб-кабинета","settings.pwd.web.confirm.label":"Подтвердите новый пароль","settings.pwd.req.length":"Минимум 8 символов","settings.pwd.req.upper":"Заглавная буква","settings.pwd.req.lower":"Строчная буква","settings.pwd.req.number":"Цифра","settings.pwd.req.special":"Специальный символ (!@#$%)","settings.pwd.web.btn":"Сменить пароль","settings.pwd.wifi.form.title":"Сменить пароль точки доступа WiFi","settings.pwd.wifi.desc":"Сменить пароль точки доступа WiFi в режиме AP.","settings.pwd.wifi.new.label":"Новый пароль WiFi AP","settings.pwd.wifi.confirm.label":"Подтвердите новый пароль WiFi AP","settings.pwd.wifi.btn":"Сменить пароль WiFi","settings.pwd.err.match":"Пароли не совпадают!","settings.pwd.err.requirements":"Пароль не соответствует требованиям!","settings.pwd.err.wifi.short":"Пароль WiFi должен быть не менее 8 символов!","settings.pwd.web.saved":"Пароль успешно изменён!","settings.pwd.wifi.saved":"Пароль AP изменён. Устройство перезагружается.","settings.pwd.wifi.restarted":"Устройство перезагружено. Подключитесь к WiFi AP с новым паролем.","settings.pwd.match":"Пароли совпадают!","settings.ble.title":"Настройки Bluetooth","settings.ble.label":"Имя BLE устройства (макс. 15 символов):","settings.ble.btn":"Сохранить имя BLE","settings.ble.saved":"Имя BLE устройства обновлено!","settings.mdns.title":"Настройки mDNS","settings.mdns.label":"Имя хоста mDNS (напр., 't-disp-totp'):","settings.mdns.btn":"Сохранить имя хоста mDNS","settings.mdns.saved":"Имя хоста mDNS обновлено!","settings.wifi.title":"📶 Сеть WiFi","settings.wifi.ssid.label":"SSID сети","settings.wifi.ssid.placeholder":"Название сети WiFi","settings.wifi.pwd.label":"Пароль","settings.wifi.pwd.placeholder":"Пароль WiFi (мин. 8 символов)","settings.wifi.confirm.label":"Подтвердите пароль","settings.wifi.confirm.placeholder":"Повторите пароль","settings.wifi.btn":"Сохранить данные WiFi","settings.wifi.note":"⚠ Изменения применятся после перезагрузки.","settings.wifi.err.ssid":"SSID обязателен.","settings.wifi.err.match":"Пароли не совпадают.","settings.wifi.err.short":"Пароль должен быть не менее 8 символов.","settings.wifi.err.failed":"Запрос не выполнен.","settings.wifi.saved":"Данные WiFi сохранены!","settings.scan.scanning":"⏳ Сканирование...","settings.scan.btn":"📡 Сканировать","settings.scan.failed":"Сканирование не удалось","settings.startup.title":"Режим запуска","settings.startup.label":"Режим по умолчанию при запуске:","settings.startup.opt.totp":"TOTP-аутентификатор","settings.startup.opt.pwd":"Менеджер паролей","settings.startup.btn":"Сохранить режим запуска","settings.startup.saved":"Режим запуска успешно сохранён!","settings.boot.title":"Режим загрузки","settings.boot.label":"Сетевой режим по умолчанию при загрузке:","settings.boot.opt.wifi":"Режим WiFi","settings.boot.opt.ap":"Режим AP","settings.boot.opt.offline":"Автономный режим","settings.boot.note":"Переопределение доступно кнопками при загрузке (окно 2 сек).","settings.boot.btn":"Сохранить режим загрузки","settings.boot.saving":"Сохранение...","settings.boot.saved":"Режим загрузки сохранён! Применится при следующей перезагрузке.","settings.hid.title":"Режим HID отправки","settings.hid.label":"Режим по умолчанию при отправке пароля:","settings.hid.opt.ble":"BLE (авто) / USB через BTN2","settings.hid.opt.usb":"USB (авто) / BLE через BTN1","settings.hid.note":"Переключение доступно кнопками в течение 3 сек.","settings.hid.btn":"Сохранить режим HID","settings.hid.saving":"Сохранение...","settings.hid.saved":"Режим HID сохранён.","settings.hid.error":"Ошибка сохранения режима HID.","settings.webserver.title":"Веб-сервер","settings.webserver.label":"Автовыключение при неактивности:","settings.webserver.opt.5m":"5 минут","settings.webserver.opt.10m":"10 минут","settings.webserver.opt.1h":"1 час","settings.webserver.opt.never":"Никогда","settings.webserver.btn":"Сохранить","settings.webserver.saving":"Сохранение настроек и перезапуск устройства...","settings.session.title":"Таймер автовыхода","settings.session.label":"Время сессии:","settings.session.opt.reboot":"До перезагрузки устройства","settings.session.opt.1h":"1 час","settings.session.opt.6h":"6 часов (по умолчанию)","settings.session.opt.24h":"24 часа","settings.session.opt.3d":"3 дня","settings.session.notice":"Управляет временем автовыхода для безопасности. Сессии сохраняются при перезагрузке, кроме режима «До перезагрузки», который требует повторного входа. Длинные сессии удобны, но снижают безопасность при потере устройства.","settings.session.btn":"Сохранить таймер автовыхода","settings.session.info.reboot":"Сессии будут истекать при перезагрузке устройства.","settings.session.info.1h":"Сессии будут истекать через 1 час.","settings.session.info.6h":"Сессии будут истекать через 6 часов.","settings.session.info.24h":"Сессии будут истекать через 24 часа.","settings.session.info.3d":"Сессии будут истекать через 3 дня.","settings.session.info.fallback":"Длительность сессии обновлена.","settings.session.err":"Не удалось обновить длительность сессии.","settings.system.title":"Система","settings.system.reboot":"Перезагрузить устройство","settings.system.reboot.web":"Перезагрузить с веб-сервером","settings.system.ble.clear":"Очистить BLE-клиенты","settings.system.logout":"Выйти","settings.system.ble.cleared":"BLE-клиенты успешно очищены!","settings.system.rebooting.web":"Перезагрузка с включённым веб-сервером...","settings.system.rebooting":"Перезагрузка...","system.shutdown.title":"Сессия истекает","system.shutdown.btn":"Продолжить сессию","system.shutdown.shutdown.title":"Сервер отключается","system.shutdown.shutdown.desc":"Сервер отключился из-за неактивности. Для доступа перезагрузите устройство.","passwords.modal.password":"Пароль:","passwords.export.success":"Экспорт выполнен успешно!","passwords.import.success":"Импорт выполнен успешно!","keys.api.active":"Активен ({s}с осталось)","keys.btn.export":"Экспорт ключей","keys.btn.import":"Импорт ключей","keys.export.title":"Подтверждение экспорта","keys.export.desc":"Введите пароль администратора для шифрования и экспорта данных.","keys.import.title":"Подтверждение импорта","keys.import.desc":"Введите пароль администратора для расшифровки и импорта файла. Существующие данные будут перезаписаны."},de:{"app.title":"Authentifikator-Systemsteuerung","tab.keys":"Schlüssel","tab.passwords":"Passwörter","tab.display":"Anzeige","tab.pin":"PIN","tab.settings":"Einstellungen","keys.title":"Schlüssel verwalten","keys.add.title":"Neuen Schlüssel hinzufügen","keys.add.btn":"Schlüssel hinzufügen","keys.current.title":"Aktuelle Schlüssel","keys.importexport.title":"Schlüssel importieren/exportieren","keys.advanced":"Erweiterte Einstellungen","keys.hotp.sync":"HOTP-Zähler werden zusammen mit TOTP-Schlüsseln synchronisiert","keys.api.status":"API-Status:","keys.api.inactive":"Inaktiv","keys.add.success":"✅ Schlüssel erfolgreich hinzugefügt!","keys.remove.success":"Schlüssel entfernt!","keys.order.saved":"Schlüsselreihenfolge gespeichert!","keys.api.enabled":"API-Zugriff für 5 Minuten aktiviert.","keys.hotp.generated":"✅ HOTP-Code generiert","keys.copied":"TOTP-Code kopiert!","keys.hotp_copied":"HOTP-Code kopiert!","ui.loading":"Laden...","keys.col.name":"Name","keys.col.code":"Code","keys.col.timer":"Timer","keys.col.progress":"Fortschritt","keys.col.actions":"Aktionen","keys.btn.remove":"Entfernen","keys.btn.next":"🔄 Weiter","keys.api.enable":"API aktivieren (5 Min)","keys.field.name":"Name:","keys.field.secret":"Geheimnis (Base32):","keys.field.algorithm":"Algorithmus:","keys.type.totp":"TOTP (zeitbasiert)","keys.type.hotp":"HOTP (zählerbasiert)","keys.digits.6":"6 Ziffern","keys.digits.8":"8 Ziffern","keys.period.30":"30 Sekunden","keys.period.60":"60 Sekunden","keys.field.digits":"Ziffern:","keys.field.period":"Zeitraum:","keys.algo.sha1":"SHA1 (Standard)","keys.api.active":"Aktiv (noch {s}s)","passwords.title":"Passwörter verwalten","passwords.add.title":"Neues Passwort hinzufügen","passwords.field.name":"Name:","passwords.field.password":"Passwort:","passwords.add.btn":"Passwort hinzufügen","passwords.current.title":"Aktuelle Passwörter","passwords.col.name":"Name","passwords.col.actions":"Aktionen","passwords.btn.copy":"Kopieren","passwords.btn.edit":"Bearbeiten","passwords.btn.remove":"Entfernen","passwords.copied":"Passwort kopiert!","passwords.updated":"Passwort aktualisiert!","passwords.removed":"Passwort entfernt!","passwords.added":"Passwort hinzugefügt!","passwords.order.saved":"Passwortreihenfolge gespeichert!","passwords.order.failed":"Fehler beim Speichern der Reihenfolge.","passwords.gen.title":"Passwort-Generator","passwords.gen.desc":"Wählen Sie eine Länge und generieren Sie ein sicheres Passwort","passwords.gen.generated":"Generiertes Passwort:","passwords.gen.btn.generate":"Generieren","passwords.gen.btn.use":"Dieses Passwort verwenden","passwords.edit.title":"Passwort bearbeiten","passwords.edit.desc":"Name und Passwort für diesen Eintrag ändern","passwords.edit.name":"Name:","passwords.edit.password":"Passwort:","passwords.edit.btn.save":"Speichern","passwords.edit.btn.cancel":"Abbrechen","passwords.strength.weak":"Schwaches Passwort","passwords.strength.medium":"Mittleres Passwort","passwords.strength.strong":"Starkes Passwort","passwords.strength.encryption":"Verschlüsselungsschlüssel","passwords.importexport.title":"Passwörter importieren/exportieren","passwords.btn.export":"Passwörter exportieren","passwords.btn.import":"Passwörter importieren","passwords.gen.length":"Passwortlänge:","passwords.modal.confirm":"Bestätigen","passwords.export.title":"Export bestätigen","passwords.export.desc":"Geben Sie Ihr Admin-Passwort ein, um die Passwörter zu verschlüsseln und zu exportieren.","passwords.import.title":"Import bestätigen","passwords.import.desc":"Geben Sie Ihr Admin-Passwort ein, um die Passwörter zu entschlüsseln und zu importieren.","system.shutdown.desc":"Der Webserver wird aufgrund von Inaktivität automatisch heruntergefahren.","system.shutdown.remaining":"Verbleibende Zeit:","display.title":"Anzeigeeinstellungen","display.theme.saved":"Design erfolgreich übernommen!","display.theme.title":"Themenauswahl","display.theme.light":"Helles Design","display.theme.dark":"Dunkles Design","display.theme.btn":"Design anwenden","display.splash.title":"Startbildschirm","display.splash.label":"Eingebetteter Startbildschirm-Modus:","display.splash.disabled":"Deaktiviert (kein Startbildschirm)","display.splash.btn":"Modus speichern","display.splash.saved":"Startbildschirm-Modus gespeichert! Neustart erforderlich.","display.splash.select":"Bitte Startbildschirm-Modus auswählen","display.clock.title":"Uhrzeitanzeige","display.clock.timezone":"Zeitzone:","display.clock.save.tz":"Zeitzone speichern","display.clock.tz.saved":"Zeitzone gespeichert! Sofort angewendet.","display.clock.tz.select":"Bitte Zeitzone auswählen","display.rtc.title":"DS3231-RTC-Modul","display.rtc.desc":"Hardwareuhr für Offline-/AP-Modus","display.rtc.sda":"SDA-Pin","display.rtc.scl":"SCL-Pin","display.rtc.btn":"Sync & Speichern","display.rtc.saving":"Speichern...","display.rtc.saved":"RTC-Einstellungen gespeichert","display.rtc.status.notfound":"Nicht gefunden","display.rtc.status.check":"I2C-Pins prüfen","display.rtc.status.drifted":"Zeitdrift","display.rtc.status.ok":"OK","display.rtc.hint.ntp":"Die Zeit wird beim nächsten WiFi-Start automatisch mit NTP synchronisiert.","display.rtc.hint.browser":"Die Zeit wird beim Speichern mit der Browseruhr synchronisiert.","display.lock.title":"Bildschirm & Sperre","display.lock.screen.label":"Bildschirm-Timeout (Display ausschalten nach):","display.lock.auto.label":"Automatische Sperre (Tiefschlaf + PIN nach):","display.lock.warning":"Die automatische Sperre muss länger als der Bildschirm-Timeout sein, wenn beide aktiviert sind.","display.lock.btn":"Einstellungen speichern","display.lock.saved":"Anzeigeeinstellungen erfolgreich gespeichert!","display.lock.error.order":"Der Auto-Sperr-Timeout muss größer als der Bildschirm-Timeout sein!","display.lock.never":"Nie","display.lock.opt.15s":"15 Sekunden","display.lock.opt.30s":"30 Sekunden","display.lock.opt.1m":"1 Minute","display.lock.opt.5m":"5 Minuten","display.lock.opt.15m":"15 Minuten","display.lock.opt.30m":"30 Minuten","display.lock.opt.1h":"1 Stunde","display.lock.opt.4h":"4 Stunden","pin.title":"PIN-Code-Einstellungen","pin.startup.label":"Start-PIN","pin.startup.desc":"Geräteschlüssel beim Start mit PIN verschlüsseln","pin.startup.btn":"Start-PIN-Einstellungen speichern","pin.cancelled":"PIN-Änderung abgebrochen.","pin.reset.cancelled":"Zurücksetzen abgebrochen.","pin.rebooting":"Gerät wird neu gestartet... Bitte warten.","pin.ble.title":"BLE-Kopplungs-PIN","pin.ble.notice":"Dieser PIN wird beim BLE-Koppeln zur Client-Authentifizierung auf dem Gerät angezeigt.","pin.ble.label.new":"Neuer BLE-Kopplungs-PIN (6 Ziffern):","pin.ble.label.confirm":"BLE-Kopplungs-PIN bestätigen:","pin.ble.important":"Dieser PIN wird beim BLE-Koppeln auf dem ESP32-Bildschirm zur Eingabe durch den Client angezeigt.","pin.ble.btn":"BLE-Kopplungs-PIN aktualisieren","pin.ble.saved":"BLE-Kopplungs-PIN aktualisiert! Alle BLE-Clients getrennt.","pin.ble.error.digits":"BLE-Kopplungs-PIN muss genau 6 Ziffern haben!","pin.ble.error.match":"BLE-Kopplungs-PINs stimmen nicht überein!","pin.placeholder.enter":"6-stelligen PIN eingeben","pin.placeholder.confirm":"6-stelligen PIN bestätigen","pin.device.title":"Geräte-BLE-PIN","pin.device.notice":"Dieser PIN wird auf dem Gerät beim Übertragen von Passwörtern über BLE benötigt.","pin.device.label.enable":"Geräte-BLE-PIN aktivieren","pin.device.desc":"PIN auf dem Gerät für BLE-Passwortübertragung erforderlich","pin.device.label.new":"Neuer Geräte-BLE-PIN (6 Ziffern):","pin.device.label.confirm":"Geräte-BLE-PIN bestätigen:","pin.device.important":"Dieser PIN wird auf dem Gerät beim Übertragen von Passwörtern über BLE benötigt.","pin.device.btn":"Geräte-BLE-PIN speichern","pin.device.saved":"Geräte-BLE-PIN aktualisiert!","pin.device.disabled":"Geräte-BLE-PIN deaktiviert","pin.device.error.enable":"Bitte zuerst Geräte-BLE-PIN aktivieren","pin.device.error.digits":"Geräte-BLE-PIN muss genau 6 Ziffern haben!","pin.device.error.match":"Geräte-BLE-PINs stimmen nicht überein!","settings.title":"Geräteeinstellungen","settings.pwd.title":"Passwortverwaltung","settings.pwd.toggle.web":"Web-Kabinett","settings.pwd.toggle.wifi":"WLAN-Zugangspunkt","settings.pwd.web.form.title":"Web-Kabinett-Passwort ändern","settings.pwd.web.desc":"Passwort für den Zugriff auf diese Weboberfläche ändern.","settings.pwd.current.login":"Aktuelle Anmeldung:","settings.pwd.web.new.label":"Neues Web-Passwort","settings.pwd.web.confirm.label":"Neues Web-Passwort bestätigen","settings.pwd.req.length":"Mindestens 8 Zeichen","settings.pwd.req.upper":"Ein Großbuchstabe","settings.pwd.req.lower":"Ein Kleinbuchstabe","settings.pwd.req.number":"Eine Zahl","settings.pwd.req.special":"Ein Sonderzeichen (!@#$%)","settings.pwd.web.btn":"Passwort ändern","settings.pwd.wifi.form.title":"WLAN-Zugangspunkt-Passwort ändern","settings.pwd.wifi.desc":"Passwort für den WLAN-Zugangspunkt im AP-Modus ändern.","settings.pwd.wifi.new.label":"Neues WLAN-AP-Passwort","settings.pwd.wifi.confirm.label":"Neues WLAN-AP-Passwort bestätigen","settings.pwd.wifi.btn":"WLAN-Passwort ändern","settings.pwd.err.match":"Passwörter stimmen nicht überein!","settings.pwd.err.requirements":"Passwort erfüllt die Anforderungen nicht!","settings.pwd.err.wifi.short":"WLAN-Passwort muss mindestens 8 Zeichen haben!","settings.pwd.web.saved":"Passwort erfolgreich geändert!","settings.pwd.wifi.saved":"AP-Passwort geändert. Gerät wird neu gestartet.","settings.pwd.wifi.restarted":"Gerät neu gestartet. Mit neuem Passwort mit WLAN-AP verbinden.","settings.pwd.match":"Passwörter stimmen überein!","settings.ble.title":"Bluetooth-Einstellungen","settings.ble.label":"BLE-Gerätename (max. 15 Zeichen):","settings.ble.btn":"BLE-Name speichern","settings.ble.saved":"BLE-Gerätename aktualisiert!","settings.mdns.title":"mDNS-Einstellungen","settings.mdns.label":"mDNS-Hostname (z.B. 't-disp-totp'):","settings.mdns.btn":"mDNS-Hostname speichern","settings.mdns.saved":"mDNS-Hostname aktualisiert!","settings.wifi.title":"📶 WLAN-Netzwerk","settings.wifi.ssid.label":"Netzwerk-SSID","settings.wifi.ssid.placeholder":"WLAN-Netzwerkname","settings.wifi.pwd.label":"Passwort","settings.wifi.pwd.placeholder":"WLAN-Passwort (min. 8 Zeichen)","settings.wifi.confirm.label":"Passwort bestätigen","settings.wifi.confirm.placeholder":"Passwort wiederholen","settings.wifi.btn":"WLAN-Zugangsdaten speichern","settings.wifi.note":"⚠ Änderungen werden nach dem Neustart angewendet.","settings.wifi.err.ssid":"SSID ist erforderlich.","settings.wifi.err.match":"Passwörter stimmen nicht überein.","settings.wifi.err.short":"Passwort muss mindestens 8 Zeichen haben.","settings.wifi.err.failed":"Anfrage fehlgeschlagen.","settings.wifi.saved":"WLAN-Zugangsdaten gespeichert!","settings.scan.scanning":"⏳ Scannen...","settings.scan.btn":"📡 Scannen","settings.scan.failed":"Scan fehlgeschlagen","settings.startup.title":"Startmodus","settings.startup.label":"Standardmodus beim Start:","settings.startup.opt.totp":"TOTP-Authentifikator","settings.startup.opt.pwd":"Passwort-Manager","settings.startup.btn":"Startmodus speichern","settings.startup.saved":"Startmodus erfolgreich gespeichert!","settings.boot.title":"Boot-Modus","settings.boot.label":"Standard-Netzwerkmodus beim Booten:","settings.boot.opt.wifi":"WLAN-Modus","settings.boot.opt.ap":"AP-Modus","settings.boot.opt.offline":"Offline-Modus","settings.boot.note":"Überschreibung über Tasten beim Booten möglich (2-Sek.-Fenster).","settings.boot.btn":"Boot-Modus speichern","settings.boot.saving":"Speichern...","settings.boot.saved":"Boot-Modus gespeichert! Wird beim nächsten Neustart angewendet.","settings.hid.title":"HID-Sendemodus","settings.hid.label":"Standardmodus beim Senden des Passworts:","settings.hid.opt.ble":"BLE (auto) / USB über BTN2","settings.hid.opt.usb":"USB (auto) / BLE über BTN1","settings.hid.note":"Überschreibung per Tasten während 3s möglich.","settings.hid.btn":"HID-Modus speichern","settings.hid.saving":"Speichern...","settings.hid.saved":"HID-Modus gespeichert.","settings.hid.error":"Fehler beim Speichern des HID-Modus.","settings.webserver.title":"Webserver","settings.webserver.label":"Automatisches Herunterfahren bei Inaktivität:","settings.webserver.opt.5m":"5 Minuten","settings.webserver.opt.10m":"10 Minuten","settings.webserver.opt.1h":"1 Stunde","settings.webserver.opt.never":"Nie","settings.webserver.btn":"Einstellung speichern","settings.webserver.saving":"Einstellungen werden gespeichert und Gerät neu gestartet...","settings.session.title":"Auto-Abmelde-Timer","settings.session.label":"Angemeldete Sitzungsdauer:","settings.session.opt.reboot":"Bis zum Geräte-Neustart","settings.session.opt.1h":"1 Stunde","settings.session.opt.6h":"6 Stunden (Standard)","settings.session.opt.24h":"24 Stunden","settings.session.opt.3d":"3 Tage","settings.session.notice":"Steuert die automatische Abmeldezeit für erhöhte Sicherheit. Sitzungen überleben Neustarts, außer im Modus «Bis Neustart», der nach dem Einschalten eine neue Anmeldung erfordert. Längere Sitzungen reduzieren die Anmeldefrequenz, können aber die Sicherheit bei Geräteverlust gefährden.","settings.session.btn":"Auto-Abmelde-Timer speichern","settings.session.info.reboot":"Sitzungen laufen jetzt beim Geräte-Neustart ab.","settings.session.info.1h":"Sitzungen laufen jetzt nach 1 Stunde ab.","settings.session.info.6h":"Sitzungen laufen jetzt nach 6 Stunden ab.","settings.session.info.24h":"Sitzungen laufen jetzt nach 24 Stunden ab.","settings.session.info.3d":"Sitzungen laufen jetzt nach 3 Tagen ab.","settings.session.info.fallback":"Sitzungsdauer aktualisiert.","settings.session.err":"Sitzungsdauer konnte nicht aktualisiert werden.","settings.system.title":"System","settings.system.reboot":"Gerät neu starten","settings.system.reboot.web":"Mit Webserver neu starten","settings.system.ble.clear":"BLE-Clients löschen","settings.system.logout":"Abmelden","settings.system.ble.cleared":"BLE-Clients erfolgreich gelöscht!","settings.system.rebooting.web":"Neustart mit aktiviertem Webserver...","settings.system.rebooting":"Neustart...","system.shutdown.title":"Sitzungs-Timeout","system.shutdown.btn":"Sitzung fortsetzen","system.shutdown.shutdown.title":"Server wird heruntergefahren","system.shutdown.shutdown.desc":"Der Server wurde aufgrund von Inaktivität heruntergefahren. Bitte starten Sie das Gerät neu.","passwords.modal.password":"Passwort:","passwords.export.success":"Export erfolgreich!","passwords.import.success":"Import erfolgreich!","keys.btn.export":"Schlüssel exportieren","keys.btn.import":"Schlüssel importieren","keys.export.title":"Export bestätigen","keys.export.desc":"Geben Sie Ihr Admin-Passwort ein, um die Daten zu verschlüsseln und zu exportieren.","keys.import.title":"Import bestätigen","keys.import.desc":"Geben Sie Ihr Admin-Passwort ein, um die Datei zu entschlüsseln und zu importieren. Bestehende Daten werden überschrieben."},zh:{"app.title":"验证器控制面板","tab.keys":"密钥","tab.passwords":"密码","tab.display":"显示","tab.pin":"PIN码","tab.settings":"设置","keys.title":"管理密钥","keys.add.title":"添加新密钥","keys.add.btn":"添加密钥","keys.current.title":"当前密钥","keys.importexport.title":"导入/导出密钥","keys.advanced":"高级设置","keys.hotp.sync":"HOTP计数器与TOTP密钥同步","keys.api.status":"API状态:","keys.api.inactive":"未激活","keys.add.success":"✅ 密钥添加成功！","keys.remove.success":"密钥已删除！","keys.order.saved":"密钥顺序已保存！","keys.api.enabled":"API访问已开放5分钟。","keys.hotp.generated":"✅ 已生成HOTP代码","keys.copied":"TOTP代码已复制！","keys.hotp_copied":"HOTP代码已复制！","ui.loading":"加载中...","keys.col.name":"名称","keys.col.code":"代码","keys.col.timer":"计时器","keys.col.progress":"进度","keys.col.actions":"操作","keys.btn.remove":"删除","keys.btn.next":"🔄 下一个","keys.api.enable":"启用API (5分钟)","keys.field.name":"名称:","keys.field.secret":"密钥 (Base32):","keys.field.algorithm":"算法:","keys.type.totp":"TOTP (基于时间)","keys.type.hotp":"HOTP (基于计数器)","keys.digits.6":"6位数字","keys.digits.8":"8位数字","keys.period.30":"30秒","keys.period.60":"60秒","keys.field.digits":"位数:","keys.field.period":"周期:","keys.algo.sha1":"SHA1 (标准)","passwords.title":"管理密码","passwords.add.title":"添加新密码","passwords.field.name":"名称:","passwords.field.password":"密码:","passwords.add.btn":"添加密码","passwords.current.title":"当前密码","passwords.col.name":"名称","passwords.col.actions":"操作","passwords.btn.copy":"复制","passwords.btn.edit":"编辑","passwords.btn.remove":"删除","passwords.copied":"密码已复制！","passwords.updated":"密码已更新！","passwords.removed":"密码已删除！","passwords.added":"密码已添加！","passwords.order.saved":"密码顺序已保存！","passwords.order.failed":"保存密码顺序失败。","passwords.gen.title":"密码生成器","passwords.gen.desc":"选择密码长度并生成安全密码","passwords.gen.generated":"生成的密码:","passwords.gen.btn.generate":"立即生成","passwords.gen.btn.use":"使用此密码","passwords.edit.title":"编辑密码","passwords.edit.desc":"更改此条目的名称和密码","passwords.edit.name":"名称:","passwords.edit.password":"密码:","passwords.edit.btn.save":"保存","passwords.edit.btn.cancel":"取消","passwords.strength.weak":"弱密码","passwords.strength.medium":"中等密码","passwords.strength.strong":"强密码","passwords.strength.encryption":"加密密钥","passwords.importexport.title":"导入/导出密码","passwords.btn.export":"导出密码","passwords.btn.import":"导入密码","passwords.gen.length":"密码长度:","passwords.modal.confirm":"确认","passwords.export.title":"确认导出","passwords.export.desc":"请输入管理员密码以加密并导出密码。","passwords.import.title":"确认导入","passwords.import.desc":"请输入管理员密码以解密并导入密码。","system.shutdown.desc":"由于不活动，Web服务器将自动关闭。","system.shutdown.remaining":"剩余时间:","display.title":"显示设置","display.theme.saved":"主题已成功应用！","display.theme.title":"主题选择","display.theme.light":"浅色主题","display.theme.dark":"深色主题","display.theme.btn":"应用主题","display.splash.title":"启动画面","display.splash.label":"内置启动画面模式:","display.splash.disabled":"禁用（无启动画面）","display.splash.btn":"保存模式","display.splash.saved":"启动画面模式已保存！重启后生效。","display.splash.select":"请选择启动画面模式","display.clock.title":"时钟显示","display.clock.timezone":"时区:","display.clock.save.tz":"保存时区","display.clock.tz.saved":"时区已保存！立即生效。","display.clock.tz.select":"请选择时区","display.rtc.title":"DS3231 RTC模块","display.rtc.desc":"用于离线/AP模式的硬件时钟","display.rtc.sda":"SDA引脚","display.rtc.scl":"SCL引脚","display.rtc.btn":"同步并保存","display.rtc.saving":"保存中...","display.rtc.saved":"RTC设置已保存","display.rtc.status.notfound":"未找到","display.rtc.status.check":"检查I2C引脚","display.rtc.status.drifted":"时间偏差","display.rtc.status.ok":"正常","display.rtc.hint.ntp":"下次WiFi启动时将自动从NTP同步时间。","display.rtc.hint.browser":"保存时将从浏览器时钟同步时间。","display.lock.title":"屏幕与锁定","display.lock.screen.label":"屏幕超时（关闭显示后）：","display.lock.auto.label":"自动锁定（深度睡眠+PIN后）：","display.lock.warning":"当两者都启用时，自动锁定必须长于屏幕超时。","display.lock.btn":"保存设置","display.lock.saved":"显示设置保存成功！","display.lock.error.order":"自动锁定超时必须大于屏幕超时！","display.lock.never":"从不","display.lock.opt.15s":"15秒","display.lock.opt.30s":"30秒","display.lock.opt.1m":"1分钟","display.lock.opt.5m":"5分钟","display.lock.opt.15m":"15分钟","display.lock.opt.30m":"30分钟","display.lock.opt.1h":"1小时","display.lock.opt.4h":"4小时","pin.title":"PIN码设置","pin.startup.label":"启动PIN","pin.startup.desc":"启动时使用PIN加密设备密钥","pin.startup.btn":"保存启动PIN设置","pin.cancelled":"PIN设置更改已取消。","pin.reset.cancelled":"重置已取消。","pin.rebooting":"设备正在重启... 请稍候。","pin.ble.title":"BLE配对PIN","pin.ble.notice":"此PIN在BLE配对时显示在设备屏幕上用于客户端验证。","pin.ble.label.new":"新BLE配对PIN（6位数字）：","pin.ble.label.confirm":"确认BLE配对PIN：","pin.ble.important":"此PIN将在BLE配对时显示在ESP32屏幕上供客户端输入。","pin.ble.btn":"更新BLE配对PIN","pin.ble.saved":"BLE配对PIN已更新！所有BLE客户端已断开。","pin.ble.error.digits":"BLE配对PIN必须恰好6位数字！","pin.ble.error.match":"BLE配对PIN不匹配！","pin.placeholder.enter":"输入6位PIN","pin.placeholder.confirm":"确认6位PIN","pin.device.title":"设备BLE PIN","pin.device.notice":"通过BLE传输密码时需要在硬件设备上输入此PIN。","pin.device.label.enable":"启用设备BLE PIN","pin.device.desc":"通过BLE传输密码时需要在设备上输入PIN","pin.device.label.new":"新设备BLE PIN（6位数字）：","pin.device.label.confirm":"确认设备BLE PIN：","pin.device.important":"通过BLE传输密码时需要在设备屏幕上输入此PIN。","pin.device.btn":"保存设备BLE PIN","pin.device.saved":"设备BLE PIN已更新！","pin.device.disabled":"设备BLE PIN已禁用","pin.device.error.enable":"请先启用设备BLE PIN","pin.device.error.digits":"设备BLE PIN必须恰好6位数字！","pin.device.error.match":"设备BLE PIN不匹配！","settings.title":"设备设置","settings.pwd.title":"密码管理","settings.pwd.toggle.web":"Web控制台","settings.pwd.toggle.wifi":"WiFi热点","settings.pwd.web.form.title":"更改Web控制台密码","settings.pwd.web.desc":"更改访问此Web界面的密码。","settings.pwd.current.login":"当前登录:","settings.pwd.web.new.label":"新Web密码","settings.pwd.web.confirm.label":"确认新Web密码","settings.pwd.req.length":"至少8个字符","settings.pwd.req.upper":"一个大写字母","settings.pwd.req.lower":"一个小写字母","settings.pwd.req.number":"一个数字","settings.pwd.req.special":"一个特殊字符 (!@#$%)","settings.pwd.web.btn":"更改密码","settings.pwd.wifi.form.title":"更改WiFi热点密码","settings.pwd.wifi.desc":"更改AP模式下WiFi热点的密码。","settings.pwd.wifi.new.label":"新WiFi AP密码","settings.pwd.wifi.confirm.label":"确认新WiFi AP密码","settings.pwd.wifi.btn":"更改WiFi密码","settings.pwd.err.match":"密码不匹配！","settings.pwd.err.requirements":"密码不符合要求！","settings.pwd.err.wifi.short":"WiFi密码至少需要8个字符！","settings.pwd.web.saved":"密码更改成功！","settings.pwd.wifi.saved":"AP密码已更改，设备正在重启。","settings.pwd.wifi.restarted":"设备已重启，请使用新密码连接WiFi热点。","settings.pwd.match":"密码匹配！","settings.ble.title":"蓝牙设置","settings.ble.label":"BLE设备名称（最多15个字符）：","settings.ble.btn":"保存BLE名称","settings.ble.saved":"BLE设备名称已更新！","settings.mdns.title":"mDNS设置","settings.mdns.label":"mDNS主机名（例如 't-disp-totp'）：","settings.mdns.btn":"保存mDNS主机名","settings.mdns.saved":"mDNS主机名已更新！","settings.wifi.title":"📶 WiFi网络","settings.wifi.ssid.label":"网络SSID","settings.wifi.ssid.placeholder":"WiFi网络名称","settings.wifi.pwd.label":"密码","settings.wifi.pwd.placeholder":"WiFi密码（最少8个字符）","settings.wifi.confirm.label":"确认密码","settings.wifi.confirm.placeholder":"重复密码","settings.wifi.btn":"保存WiFi凭据","settings.wifi.note":"⚠ 更改将在重启后生效。","settings.wifi.err.ssid":"SSID为必填项。","settings.wifi.err.match":"密码不匹配。","settings.wifi.err.short":"密码至少需要8个字符。","settings.wifi.err.failed":"请求失败。","settings.wifi.saved":"WiFi凭据已保存！","settings.scan.scanning":"⏳ 扫描中...","settings.scan.btn":"📡 扫描","settings.scan.failed":"扫描失败","settings.startup.title":"启动模式","settings.startup.label":"启动时的默认模式：","settings.startup.opt.totp":"TOTP验证器","settings.startup.opt.pwd":"密码管理器","settings.startup.btn":"保存启动模式","settings.startup.saved":"启动模式保存成功！","settings.boot.title":"引导模式","settings.boot.label":"引导时的默认网络模式：","settings.boot.opt.wifi":"WiFi模式","settings.boot.opt.ap":"AP模式","settings.boot.opt.offline":"离线模式","settings.boot.note":"可在引导时通过按钮覆盖（2秒窗口）。","settings.boot.btn":"保存引导模式","settings.boot.saving":"保存中...","settings.boot.saved":"引导模式已保存！将在下次重启时生效。","settings.hid.title":"HID发送模式","settings.hid.label":"发送密码时的默认模式：","settings.hid.opt.ble":"BLE（自动）/ USB通过BTN2","settings.hid.opt.usb":"USB（自动）/ BLE通过BTN1","settings.hid.note":"可在3秒内通过按键切换。","settings.hid.btn":"保存HID模式","settings.hid.saving":"保存中...","settings.hid.saved":"HID模式已保存。","settings.hid.error":"保存HID模式出错。","settings.webserver.title":"Web服务器","settings.webserver.label":"不活动时自动关闭：","settings.webserver.opt.5m":"5分钟","settings.webserver.opt.10m":"10分钟","settings.webserver.opt.1h":"1小时","settings.webserver.opt.never":"从不","settings.webserver.btn":"保存设置","settings.webserver.saving":"正在保存设置并重启设备...","settings.session.title":"自动注销计时器","settings.session.label":"登录保持时长：","settings.session.opt.reboot":"直到设备重启","settings.session.opt.1h":"1小时","settings.session.opt.6h":"6小时（默认）","settings.session.opt.24h":"24小时","settings.session.opt.3d":"3天","settings.session.notice":"控制自动注销时间以增强安全性。会话在设备重启后继续有效，但「直到重启」模式除外，该模式在断电后需要重新登录。较长的持续时间可减少登录频率，但设备丢失时可能降低安全性。","settings.session.btn":"保存自动注销计时器","settings.session.info.reboot":"会话现在将在设备重启时过期。","settings.session.info.1h":"会话现在将在1小时后过期。","settings.session.info.6h":"会话现在将在6小时后过期。","settings.session.info.24h":"会话现在将在24小时后过期。","settings.session.info.3d":"会话现在将在3天后过期。","settings.session.info.fallback":"会话时长已更新。","settings.session.err":"无法更新会话时长。","settings.system.title":"系统","settings.system.reboot":"重启设备","settings.system.reboot.web":"重启并启用Web服务器","settings.system.ble.clear":"清除BLE客户端","settings.system.logout":"退出登录","settings.system.ble.cleared":"BLE客户端已成功清除！","settings.system.rebooting.web":"正在重启并启用Web服务器...","settings.system.rebooting":"正在重启...","system.shutdown.title":"会话超时","system.shutdown.btn":"继续会话","system.shutdown.shutdown.title":"服务器正在关闭","system.shutdown.shutdown.desc":"服务器因不活动已关闭。请重启设备以重新访问。","passwords.modal.password":"密码:","passwords.export.success":"导出成功！","passwords.import.success":"导入成功！","keys.api.active":"活跃 (剩余{s}秒)","keys.btn.export":"导出密钥","keys.btn.import":"导入密钥","keys.export.title":"确认导出","keys.export.desc":"请输入管理员密码以加密并导出数据。","keys.import.title":"确认导入","keys.import.desc":"请输入管理员密码以解密并导入所选文件。现有数据将被覆盖。"},es:{"app.title":"Panel de control del autenticador","tab.keys":"Claves","tab.passwords":"Contraseñas","tab.display":"Pantalla","tab.pin":"PIN","tab.settings":"Ajustes","keys.title":"Gestionar claves","keys.add.title":"Añadir nueva clave","keys.add.btn":"Añadir clave","keys.current.title":"Claves actuales","keys.importexport.title":"Importar/Exportar claves","keys.advanced":"Configuración avanzada","keys.hotp.sync":"Los contadores HOTP se sincronizan junto con las claves TOTP","keys.api.status":"Estado API:","keys.api.inactive":"Inactivo","keys.add.success":"✅ ¡Clave añadida correctamente!","keys.remove.success":"¡Clave eliminada!","keys.order.saved":"¡Orden de claves guardado!","keys.api.enabled":"Acceso API habilitado por 5 minutos.","keys.hotp.generated":"✅ Código HOTP generado","keys.copied":"¡Código TOTP copiado!","keys.hotp_copied":"¡Código HOTP copiado!","ui.loading":"Cargando...","keys.col.name":"Nombre","keys.col.code":"Código","keys.col.timer":"Temporizador","keys.col.progress":"Progreso","keys.col.actions":"Acciones","keys.btn.remove":"Eliminar","keys.btn.next":"🔄 Siguiente","keys.api.enable":"Activar API (5 min)","keys.field.name":"Nombre:","keys.field.secret":"Secreto (Base32):","keys.field.algorithm":"Algoritmo:","keys.type.totp":"TOTP (basado en tiempo)","keys.type.hotp":"HOTP (basado en contador)","keys.digits.6":"6 dígitos","keys.digits.8":"8 dígitos","keys.period.30":"30 segundos","keys.period.60":"60 segundos","keys.field.digits":"Dígitos:","keys.field.period":"Período:","keys.algo.sha1":"SHA1 (Estándar)","passwords.title":"Gestionar contraseñas","passwords.add.title":"Añadir nueva contraseña","passwords.field.name":"Nombre:","passwords.field.password":"Contraseña:","passwords.add.btn":"Añadir contraseña","passwords.current.title":"Contraseñas actuales","passwords.col.name":"Nombre","passwords.col.actions":"Acciones","passwords.btn.copy":"Copiar","passwords.btn.edit":"Editar","passwords.btn.remove":"Eliminar","passwords.copied":"¡Contraseña copiada!","passwords.updated":"¡Contraseña actualizada!","passwords.removed":"¡Contraseña eliminada!","passwords.added":"¡Contraseña añadida!","passwords.order.saved":"¡Orden de contraseñas guardado!","passwords.order.failed":"Error al guardar el orden.","passwords.gen.title":"Generador de contraseñas","passwords.gen.desc":"Elige la longitud y genera una contraseña segura","passwords.gen.generated":"Contraseña generada:","passwords.gen.btn.generate":"Generar ahora","passwords.gen.btn.use":"Usar esta contraseña","passwords.edit.title":"Editar contraseña","passwords.edit.desc":"Cambiar el nombre y la contraseña de esta entrada","passwords.edit.name":"Nombre:","passwords.edit.password":"Contraseña:","passwords.edit.btn.save":"Guardar","passwords.edit.btn.cancel":"Cancelar","passwords.strength.weak":"Contraseña débil","passwords.strength.medium":"Contraseña media","passwords.strength.strong":"Contraseña fuerte","passwords.strength.encryption":"Clave de cifrado","passwords.importexport.title":"Importar/Exportar contraseñas","passwords.btn.export":"Exportar contraseñas","passwords.btn.import":"Importar contraseñas","passwords.gen.length":"Longitud de contraseña:","passwords.modal.confirm":"Confirmar","passwords.export.title":"Confirmar exportación","passwords.export.desc":"Ingrese su contraseña de administrador para cifrar y exportar las contraseñas.","passwords.import.title":"Confirmar importación","passwords.import.desc":"Ingrese su contraseña de administrador para descifrar e importar las contraseñas.","system.shutdown.desc":"El servidor web se apagará automáticamente por inactividad.","system.shutdown.remaining":"Tiempo restante:","display.title":"Configuración de pantalla","display.theme.saved":"¡Tema aplicado correctamente!","display.theme.title":"Selección de tema","display.theme.light":"Tema claro","display.theme.dark":"Tema oscuro","display.theme.btn":"Aplicar tema","display.splash.title":"Pantalla de inicio","display.splash.label":"Modo de pantalla de inicio integrada:","display.splash.disabled":"Desactivado (sin pantalla de inicio)","display.splash.btn":"Guardar modo","display.splash.saved":"¡Modo de pantalla guardado! Reinicie para aplicar.","display.splash.select":"Por favor, seleccione un modo de pantalla","display.clock.title":"Reloj","display.clock.timezone":"Zona horaria:","display.clock.save.tz":"Guardar zona horaria","display.clock.tz.saved":"¡Zona horaria guardada! Aplicada inmediatamente.","display.clock.tz.select":"Por favor, seleccione una zona horaria","display.rtc.title":"Módulo RTC DS3231","display.rtc.desc":"Reloj hardware para modo sin conexión/AP","display.rtc.sda":"Pin SDA","display.rtc.scl":"Pin SCL","display.rtc.btn":"Sincronizar y guardar","display.rtc.saving":"Guardando...","display.rtc.saved":"Configuración RTC guardada","display.rtc.status.notfound":"No encontrado","display.rtc.status.check":"Verificar pines I2C","display.rtc.status.drifted":"Deriva de tiempo","display.rtc.status.ok":"OK","display.rtc.hint.ntp":"La hora se sincronizará desde NTP automáticamente en el próximo arranque con WiFi.","display.rtc.hint.browser":"La hora se sincronizará desde el reloj del navegador cuando guarde.","display.lock.title":"Pantalla y bloqueo","display.lock.screen.label":"Tiempo de espera de pantalla (apagar pantalla después de):","display.lock.auto.label":"Bloqueo automático (sueño profundo + PIN requerido después de):","display.lock.warning":"El bloqueo automático debe ser mayor que el tiempo de espera de pantalla cuando ambos están habilitados.","display.lock.btn":"Guardar configuración","display.lock.saved":"¡Configuración de pantalla guardada correctamente!","display.lock.error.order":"¡El tiempo de bloqueo automático debe ser mayor que el tiempo de espera de pantalla!","display.lock.never":"Nunca","display.lock.opt.15s":"15 segundos","display.lock.opt.30s":"30 segundos","display.lock.opt.1m":"1 minuto","display.lock.opt.5m":"5 minutos","display.lock.opt.15m":"15 minutos","display.lock.opt.30m":"30 minutos","display.lock.opt.1h":"1 hora","display.lock.opt.4h":"4 horas","pin.title":"Configuración de PIN","pin.startup.label":"PIN de inicio","pin.startup.desc":"Cifrar clave del dispositivo con PIN al arrancar","pin.startup.btn":"Guardar configuración de PIN de inicio","pin.cancelled":"Cambio de PIN cancelado.","pin.reset.cancelled":"Restablecimiento cancelado.","pin.rebooting":"El dispositivo se está reiniciando... Por favor espere.","pin.ble.title":"PIN de emparejamiento BLE","pin.ble.notice":"Este PIN se muestra en la pantalla del dispositivo durante el emparejamiento BLE para autenticación del cliente.","pin.ble.label.new":"Nuevo PIN de emparejamiento BLE (6 dígitos):","pin.ble.label.confirm":"Confirmar PIN de emparejamiento BLE:","pin.ble.important":"Este PIN se mostrará en la pantalla ESP32 durante el emparejamiento BLE para que el cliente lo ingrese.","pin.ble.btn":"Actualizar PIN de emparejamiento BLE","pin.ble.saved":"¡PIN de emparejamiento BLE actualizado! Todos los clientes BLE desconectados.","pin.ble.error.digits":"¡El PIN de emparejamiento BLE debe tener exactamente 6 dígitos!","pin.ble.error.match":"¡Los PINs de emparejamiento BLE no coinciden!","pin.placeholder.enter":"Ingresar PIN de 6 dígitos","pin.placeholder.confirm":"Confirmar PIN de 6 dígitos","pin.device.title":"PIN de dispositivo BLE","pin.device.notice":"Este PIN es requerido en el dispositivo al transmitir contraseñas vía BLE.","pin.device.label.enable":"Habilitar PIN de dispositivo BLE","pin.device.desc":"Requerir PIN en el dispositivo para transmisión de contraseñas BLE","pin.device.label.new":"Nuevo PIN de dispositivo BLE (6 dígitos):","pin.device.label.confirm":"Confirmar PIN de dispositivo BLE:","pin.device.important":"Este PIN será requerido en la pantalla del dispositivo al transmitir contraseñas vía BLE.","pin.device.btn":"Guardar PIN de dispositivo BLE","pin.device.saved":"¡PIN de dispositivo BLE actualizado!","pin.device.disabled":"PIN de dispositivo BLE deshabilitado","pin.device.error.enable":"Por favor habilite el PIN de dispositivo BLE primero","pin.device.error.digits":"¡El PIN de dispositivo BLE debe tener exactamente 6 dígitos!","pin.device.error.match":"¡Los PINs de dispositivo BLE no coinciden!","settings.title":"Configuración del dispositivo","settings.pwd.title":"Gestión de contraseñas","settings.pwd.toggle.web":"Gabinete Web","settings.pwd.toggle.wifi":"Punto de acceso WiFi","settings.pwd.web.form.title":"Cambiar contraseña del gabinete web","settings.pwd.web.desc":"Cambiar la contraseña para acceder a esta interfaz web.","settings.pwd.current.login":"Inicio de sesión actual:","settings.pwd.web.new.label":"Nueva contraseña web","settings.pwd.web.confirm.label":"Confirmar nueva contraseña web","settings.pwd.req.length":"Al menos 8 caracteres","settings.pwd.req.upper":"Una letra mayúscula","settings.pwd.req.lower":"Una letra minúscula","settings.pwd.req.number":"Un número","settings.pwd.req.special":"Un carácter especial (!@#$%)","settings.pwd.web.btn":"Cambiar contraseña","settings.pwd.wifi.form.title":"Cambiar contraseña del punto de acceso WiFi","settings.pwd.wifi.desc":"Cambiar la contraseña del punto de acceso WiFi en modo AP.","settings.pwd.wifi.new.label":"Nueva contraseña WiFi AP","settings.pwd.wifi.confirm.label":"Confirmar nueva contraseña WiFi AP","settings.pwd.wifi.btn":"Cambiar contraseña WiFi","settings.pwd.err.match":"¡Las contraseñas no coinciden!","settings.pwd.err.requirements":"¡La contraseña no cumple los requisitos!","settings.pwd.err.wifi.short":"¡La contraseña WiFi debe tener al menos 8 caracteres!","settings.pwd.web.saved":"¡Contraseña cambiada exitosamente!","settings.pwd.wifi.saved":"Contraseña AP cambiada. El dispositivo se reinicia.","settings.pwd.wifi.restarted":"Dispositivo reiniciado. Conéctese al AP WiFi con la nueva contraseña.","settings.pwd.match":"¡Las contraseñas coinciden!","settings.ble.title":"Configuración Bluetooth","settings.ble.label":"Nombre de dispositivo BLE (máx. 15 caracteres):","settings.ble.btn":"Guardar nombre BLE","settings.ble.saved":"¡Nombre de dispositivo BLE actualizado!","settings.mdns.title":"Configuración mDNS","settings.mdns.label":"Nombre de host mDNS (ej., 't-disp-totp'):","settings.mdns.btn":"Guardar nombre de host mDNS","settings.mdns.saved":"¡Nombre de host mDNS actualizado!","settings.wifi.title":"📶 Red WiFi","settings.wifi.ssid.label":"SSID de red","settings.wifi.ssid.placeholder":"Nombre de red WiFi","settings.wifi.pwd.label":"Contraseña","settings.wifi.pwd.placeholder":"Contraseña WiFi (mín. 8 caracteres)","settings.wifi.confirm.label":"Confirmar contraseña","settings.wifi.confirm.placeholder":"Repetir contraseña","settings.wifi.btn":"Guardar credenciales WiFi","settings.wifi.note":"⚠ Los cambios se aplican después del reinicio.","settings.wifi.err.ssid":"El SSID es obligatorio.","settings.wifi.err.match":"Las contraseñas no coinciden.","settings.wifi.err.short":"La contraseña debe tener al menos 8 caracteres.","settings.wifi.err.failed":"Solicitud fallida.","settings.wifi.saved":"¡Credenciales WiFi guardadas!","settings.scan.scanning":"⏳ Escaneando...","settings.scan.btn":"📡 Escanear","settings.scan.failed":"Escaneo fallido","settings.startup.title":"Modo de inicio","settings.startup.label":"Modo predeterminado al iniciar:","settings.startup.opt.totp":"Autenticador TOTP","settings.startup.opt.pwd":"Gestor de contraseñas","settings.startup.btn":"Guardar modo de inicio","settings.startup.saved":"¡Modo de inicio guardado correctamente!","settings.boot.title":"Modo de arranque","settings.boot.label":"Modo de red predeterminado al arrancar:","settings.boot.opt.wifi":"Modo WiFi","settings.boot.opt.ap":"Modo AP","settings.boot.opt.offline":"Modo sin conexión","settings.boot.note":"Anulación disponible con botones durante el arranque (ventana de 2 seg).","settings.boot.btn":"Guardar modo de arranque","settings.boot.saving":"Guardando...","settings.boot.saved":"¡Modo de arranque guardado! Se aplicará en el próximo reinicio.","settings.hid.title":"Modo de envío HID","settings.hid.label":"Modo predeterminado al enviar contraseña:","settings.hid.opt.ble":"BLE (auto) / USB con BTN2","settings.hid.opt.usb":"USB (auto) / BLE con BTN1","settings.hid.note":"Anulación disponible con botones durante 3s.","settings.hid.btn":"Guardar modo HID","settings.hid.saving":"Guardando...","settings.hid.saved":"Modo HID guardado.","settings.hid.error":"Error al guardar el modo HID.","settings.webserver.title":"Servidor web","settings.webserver.label":"Apagado automático por inactividad:","settings.webserver.opt.5m":"5 minutos","settings.webserver.opt.10m":"10 minutos","settings.webserver.opt.1h":"1 hora","settings.webserver.opt.never":"Nunca","settings.webserver.btn":"Guardar ajuste","settings.webserver.saving":"Guardando configuración y reiniciando dispositivo...","settings.session.title":"Temporizador de cierre de sesión","settings.session.label":"Tiempo de sesión activa:","settings.session.opt.reboot":"Hasta el reinicio del dispositivo","settings.session.opt.1h":"1 hora","settings.session.opt.6h":"6 horas (predeterminado)","settings.session.opt.24h":"24 horas","settings.session.opt.3d":"3 días","settings.session.notice":"Controla el tiempo de cierre de sesión automático para mayor seguridad. Las sesiones sobreviven a los reinicios excepto el modo «Hasta reinicio», que requiere inicio de sesión tras apagado. Las duraciones largas reducen la frecuencia de inicio de sesión pero pueden comprometer la seguridad si el dispositivo se pierde.","settings.session.btn":"Guardar temporizador de cierre","settings.session.info.reboot":"Las sesiones ahora expirarán al reiniciar el dispositivo.","settings.session.info.1h":"Las sesiones ahora expirarán después de 1 hora.","settings.session.info.6h":"Las sesiones ahora expirarán después de 6 horas.","settings.session.info.24h":"Las sesiones ahora expirarán después de 24 horas.","settings.session.info.3d":"Las sesiones ahora expirarán después de 3 días.","settings.session.info.fallback":"Duración de sesión actualizada.","settings.session.err":"No se pudo actualizar la duración de la sesión.","settings.system.title":"Sistema","settings.system.reboot":"Reiniciar dispositivo","settings.system.reboot.web":"Reiniciar con servidor web","settings.system.ble.clear":"Borrar clientes BLE","settings.system.logout":"Cerrar sesión","settings.system.ble.cleared":"¡Clientes BLE borrados correctamente!","settings.system.rebooting.web":"Reiniciando con servidor web habilitado...","settings.system.rebooting":"Reiniciando...","system.shutdown.title":"Tiempo de sesión agotado","system.shutdown.btn":"Continuar sesión","system.shutdown.shutdown.title":"Servidor apagándose","system.shutdown.shutdown.desc":"El servidor se apagó por inactividad. Por favor, reinicie el dispositivo para acceder.","passwords.modal.password":"Contraseña:","passwords.export.success":"¡Exportación exitosa!","passwords.import.success":"¡Importación exitosa!","keys.api.active":"Activo ({s}s restantes)","keys.btn.export":"Exportar claves","keys.btn.import":"Importar claves","keys.export.title":"Confirmar exportación","keys.export.desc":"Ingrese su contraseña de administrador para cifrar y exportar los datos.","keys.import.title":"Confirmar importación","keys.import.desc":"Ingrese su contraseña de administrador para descifrar e importar el archivo seleccionado. Los datos existentes serán sobrescritos."},en:{"app.title":"Authenticator Control Panel","tab.keys":"Keys","tab.passwords":"Passwords","tab.display":"Display","tab.pin":"PIN","tab.settings":"Settings","keys.title":"Manage Keys","keys.add.title":"Add New Key","keys.add.btn":"Add Key","keys.current.title":"Current Keys","keys.importexport.title":"Import/Export Keys","keys.advanced":"Advanced Settings","keys.hotp.sync":"HOTP counters are synced together with TOTP keys","keys.api.status":"API Status:","keys.api.inactive":"Inactive","keys.add.success":"✅ Key added successfully!","keys.remove.success":"Key removed successfully!","keys.order.saved":"Keys order saved!","keys.api.enabled":"API access enabled for 5 minutes.","keys.hotp.generated":"✅ HOTP code generated","keys.copied":"TOTP code copied!","keys.hotp_copied":"HOTP code copied!","ui.loading":"Loading...","keys.col.name":"Name","keys.col.code":"Code","keys.col.timer":"Timer","keys.col.progress":"Progress","keys.col.actions":"Actions","keys.btn.remove":"Remove","keys.btn.next":"🔄 Next","keys.api.enable":"Enable API Access (5 min)","keys.field.name":"Name:","keys.field.secret":"Secret (Base32):","keys.field.algorithm":"Algorithm:","keys.type.totp":"TOTP (Time-based)","keys.type.hotp":"HOTP (Counter-based)","keys.digits.6":"6 digits","keys.digits.8":"8 digits","keys.period.30":"30 seconds","keys.period.60":"60 seconds","keys.field.digits":"Digits:","keys.field.period":"Period:","keys.algo.sha1":"SHA1 (Standard)","keys.api.active":"Active ({s}s remaining)","passwords.title":"Manage Passwords","passwords.add.title":"Add New Password","passwords.field.name":"Name:","passwords.field.password":"Password:","passwords.add.btn":"Add Password","passwords.current.title":"Current Passwords","passwords.col.name":"Name","passwords.col.actions":"Actions","passwords.btn.copy":"Copy","passwords.btn.edit":"Edit","passwords.btn.remove":"Remove","passwords.copied":"Password copied to clipboard!","passwords.updated":"Password updated successfully!","passwords.removed":"Password removed successfully!","passwords.added":"Password added successfully!","passwords.order.saved":"Passwords order saved!","passwords.order.failed":"Failed to save passwords order.","passwords.gen.title":"Password Generator","passwords.gen.desc":"Choose password length and generate a secure password","passwords.gen.generated":"Generated Password:","passwords.gen.btn.generate":"Generate New","passwords.gen.btn.use":"Use This Password","passwords.edit.title":"Edit Password","passwords.edit.desc":"Change the name and password for this entry","passwords.edit.name":"Name:","passwords.edit.password":"Password:","passwords.edit.btn.save":"Save","passwords.edit.btn.cancel":"Cancel","passwords.strength.weak":"Weak Password","passwords.strength.medium":"Medium Password","passwords.strength.strong":"Strong Password","passwords.strength.encryption":"Encryption Key","passwords.importexport.title":"Import/Export Passwords","passwords.btn.export":"Export Passwords","passwords.btn.import":"Import Passwords","passwords.gen.length":"Password Length:","passwords.modal.confirm":"Confirm","passwords.export.title":"Confirm Export","passwords.export.desc":"Please enter your web admin password to encrypt and export your passwords.","passwords.import.title":"Confirm Import","passwords.import.desc":"Enter your web admin password to decrypt and import your passwords.","system.shutdown.desc":"The web server will automatically shut down due to inactivity.","system.shutdown.remaining":"Time remaining:","display.title":"Display Settings","display.theme.saved":"Theme updated successfully!","display.theme.title":"Theme Selection","display.theme.light":"Light Theme","display.theme.dark":"Dark Theme","display.theme.btn":"Apply Theme","display.splash.title":"Splash Screen","display.splash.label":"Embedded Splash Mode:","display.splash.disabled":"Disabled (No splash screen)","display.splash.btn":"Save Mode","display.splash.saved":"Splash mode saved! Reboot to apply.","display.splash.select":"Please select a splash mode","display.clock.title":"Clock Display","display.clock.timezone":"Timezone:","display.clock.save.tz":"Save Timezone","display.clock.tz.saved":"Timezone saved! Applied immediately.","display.clock.tz.select":"Please select a timezone","display.rtc.title":"DS3231 RTC Module","display.rtc.desc":"Hardware clock for offline/AP time","display.rtc.sda":"SDA Pin","display.rtc.scl":"SCL Pin","display.rtc.btn":"Sync & Save","display.rtc.saving":"Saving...","display.rtc.saved":"RTC settings saved","display.rtc.status.notfound":"Not Found","display.rtc.status.check":"Check I2C pins","display.rtc.status.drifted":"Drifted","display.rtc.status.ok":"OK","display.rtc.hint.ntp":"Time will be synced from NTP automatically on next WiFi boot.","display.rtc.hint.browser":"Time will be synced from your browser clock when you save.","display.lock.title":"Screen & Lock Settings","display.lock.screen.label":"Screen timeout (turn off display after):","display.lock.auto.label":"Auto lock (deep sleep + PIN required after):","display.lock.warning":"Auto lock must be longer than screen timeout when both are enabled.","display.lock.btn":"Save Settings","display.lock.saved":"Display settings saved successfully!","display.lock.error.order":"Auto lock timeout must be greater than screen timeout!","display.lock.never":"Never","display.lock.opt.15s":"15 seconds","display.lock.opt.30s":"30 seconds","display.lock.opt.1m":"1 minute","display.lock.opt.5m":"5 minutes","display.lock.opt.15m":"15 minutes","display.lock.opt.30m":"30 minutes","display.lock.opt.1h":"1 hour","display.lock.opt.4h":"4 hours","pin.title":"PIN Code Settings","pin.startup.label":"Startup PIN","pin.startup.desc":"Encrypt device key with PIN on startup","pin.startup.btn":"Save Startup PIN Settings","pin.cancelled":"PIN settings change cancelled.","pin.reset.cancelled":"Factory reset cancelled.","pin.rebooting":"Device is rebooting... Please wait.","pin.ble.title":"BLE Bonding PIN","pin.ble.notice":"This PIN is displayed on device screen during BLE pairing for client authentication.","pin.ble.label.new":"New BLE Bonding PIN (6 digits):","pin.ble.label.confirm":"Confirm BLE Bonding PIN:","pin.ble.important":"This PIN will be displayed on the ESP32 screen during BLE pairing for clients to enter.","pin.ble.btn":"Update BLE Bonding PIN","pin.ble.saved":"BLE Bonding PIN updated successfully! All BLE clients cleared.","pin.ble.error.digits":"BLE Bonding PIN must be exactly 6 digits!","pin.ble.error.match":"BLE Bonding PINs do not match!","pin.placeholder.enter":"Enter 6-digit PIN","pin.placeholder.confirm":"Confirm 6-digit PIN","pin.device.title":"Device BLE PIN","pin.device.notice":"This PIN is required on the hardware device when transmitting passwords via BLE.","pin.device.label.enable":"Enable Device BLE PIN","pin.device.desc":"Require PIN on device for BLE password transmission","pin.device.label.new":"New Device BLE PIN (6 digits):","pin.device.label.confirm":"Confirm Device BLE PIN:","pin.device.important":"This PIN will be required on the device screen when transmitting passwords via BLE.","pin.device.btn":"Save Device BLE PIN","pin.device.saved":"Device BLE PIN updated successfully!","pin.device.disabled":"Device BLE PIN disabled","pin.device.error.enable":"Please enable Device BLE PIN first","pin.device.error.digits":"Device BLE PIN must be exactly 6 digits!","pin.device.error.match":"Device BLE PINs do not match!","settings.title":"Device Settings","settings.pwd.title":"Password Management","settings.pwd.toggle.web":"Web Cabinet","settings.pwd.toggle.wifi":"WiFi Access Point","settings.pwd.web.form.title":"Change Web Cabinet Password","settings.pwd.web.desc":"Change the password for accessing this web interface.","settings.pwd.current.login":"Current Login:","settings.pwd.web.new.label":"New Web Password","settings.pwd.web.confirm.label":"Confirm New Web Password","settings.pwd.req.length":"At least 8 characters","settings.pwd.req.upper":"An uppercase letter","settings.pwd.req.lower":"A lowercase letter","settings.pwd.req.number":"A number","settings.pwd.req.special":"A special character (!@#$%)","settings.pwd.web.btn":"Change Password","settings.pwd.wifi.form.title":"Change WiFi Access Point Password","settings.pwd.wifi.desc":"Change the password for the WiFi Access Point used in AP mode.","settings.pwd.wifi.new.label":"New WiFi AP Password","settings.pwd.wifi.confirm.label":"Confirm New WiFi AP Password","settings.pwd.wifi.btn":"Change WiFi Password","settings.pwd.err.match":"Passwords do not match!","settings.pwd.err.requirements":"Password does not meet requirements!","settings.pwd.err.wifi.short":"WiFi password must be at least 8 characters!","settings.pwd.web.saved":"Password changed successfully!","settings.pwd.wifi.saved":"AP password changed. Device is restarting.","settings.pwd.wifi.restarted":"Device restarted. Reconnect to WiFi AP with new password.","settings.pwd.match":"Passwords match!","settings.ble.title":"Bluetooth Settings","settings.ble.label":"BLE Device Name (max 15 chars):","settings.ble.btn":"Save BLE Name","settings.ble.saved":"BLE device name updated!","settings.mdns.title":"mDNS Settings","settings.mdns.label":"mDNS Hostname (e.g., 't-disp-totp'):","settings.mdns.btn":"Save mDNS Hostname","settings.mdns.saved":"mDNS hostname updated!","settings.wifi.title":"📶 WiFi Network","settings.wifi.ssid.label":"Network SSID","settings.wifi.ssid.placeholder":"WiFi network name","settings.wifi.pwd.label":"Password","settings.wifi.pwd.placeholder":"WiFi password (min 8 chars)","settings.wifi.confirm.label":"Confirm Password","settings.wifi.confirm.placeholder":"Repeat password","settings.wifi.btn":"Save WiFi Credentials","settings.wifi.note":"⚠ Changes apply after reboot.","settings.wifi.err.ssid":"SSID is required.","settings.wifi.err.match":"Passwords do not match.","settings.wifi.err.short":"Password must be at least 8 characters.","settings.wifi.err.failed":"Request failed.","settings.wifi.saved":"WiFi credentials saved!","settings.scan.scanning":"⏳ Scanning...","settings.scan.btn":"📡 Scan","settings.scan.failed":"Scan failed","settings.startup.title":"Startup Mode","settings.startup.label":"Default mode on startup:","settings.startup.opt.totp":"TOTP Authenticator","settings.startup.opt.pwd":"Password Manager","settings.startup.btn":"Save Startup Mode","settings.startup.saved":"Startup mode saved successfully!","settings.boot.title":"Boot Mode","settings.boot.label":"Default network mode on boot:","settings.boot.opt.wifi":"WiFi Mode","settings.boot.opt.ap":"AP Mode","settings.boot.opt.offline":"Offline Mode","settings.boot.note":"Override available via buttons during boot (2 sec window).","settings.boot.btn":"Save Boot Mode","settings.boot.saving":"Saving...","settings.boot.saved":"Boot mode saved! Will apply on next reboot.","settings.hid.title":"HID Send Mode","settings.hid.label":"Default mode when sending password:","settings.hid.opt.ble":"BLE (auto) / USB on BTN2","settings.hid.opt.usb":"USB (auto) / BLE on BTN1","settings.hid.note":"Override available via buttons during 3s prompt.","settings.hid.btn":"Save HID Mode","settings.hid.saving":"Saving...","settings.hid.saved":"HID mode saved.","settings.hid.error":"Error saving HID mode.","settings.webserver.title":"Web Server","settings.webserver.label":"Auto-shutdown on inactivity:","settings.webserver.opt.5m":"5 minutes","settings.webserver.opt.10m":"10 minutes","settings.webserver.opt.1h":"1 hour","settings.webserver.opt.never":"Never","settings.webserver.btn":"Save Setting","settings.webserver.saving":"Saving settings and restarting device...","settings.session.title":"Auto-Logout Timer","settings.session.label":"How long to stay logged in:","settings.session.opt.reboot":"Until device reboot","settings.session.opt.1h":"1 hour","settings.session.opt.6h":"6 hours (default)","settings.session.opt.24h":"24 hours","settings.session.opt.3d":"3 days","settings.session.notice":"Controls automatic logout timing for enhanced device security. Sessions survive device restarts except Until reboot mode which requires fresh login after power cycle. Longer durations reduce login frequency but may compromise security if device is lost or stolen.","settings.session.btn":"Save Auto-Logout Timer","settings.session.info.reboot":"Sessions will now expire on device reboot.","settings.session.info.1h":"Sessions will now expire after 1 hour.","settings.session.info.6h":"Sessions will now expire after 6 hours.","settings.session.info.24h":"Sessions will now expire after 24 hours.","settings.session.info.3d":"Sessions will now expire after 3 days.","settings.session.info.fallback":"Session duration updated.","settings.session.err":"Failed to update session duration.","settings.system.title":"System","settings.system.reboot":"Reboot Device","settings.system.reboot.web":"Reboot with Web Server","settings.system.ble.clear":"Clear BLE Clients","settings.system.logout":"Logout","settings.system.ble.cleared":"BLE clients cleared successfully!","settings.system.rebooting.web":"Rebooting with web server enabled...","settings.system.rebooting":"Rebooting...","system.shutdown.title":"Session Timeout","system.shutdown.btn":"Continue Session","system.shutdown.shutdown.title":"Server Shutting Down","system.shutdown.shutdown.desc":"The server has been shut down due to inactivity. Please reboot the device to access it again.","passwords.modal.password":"Password:","passwords.export.success":"Export successful!","passwords.import.success":"Import successful!","keys.btn.export":"Export Keys","keys.btn.import":"Import Keys","keys.export.title":"Confirm Export","keys.export.desc":"Please enter your web admin password to encrypt and export your data.","keys.import.title":"Confirm Import","keys.import.desc":"Enter your web admin password to decrypt and import the selected file. This will overwrite existing data."}};let currentLang=localStorage.getItem('lang')||'en';function tr(key){return i18n[currentLang]?.[key]??i18n['en']?.[key]??key;}async function loadLang(lang){if(i18n[lang]){applyLang(lang);return;}console.warn('Lang not available:',lang);}function applyLang(lang){currentLang=lang;localStorage.setItem('lang',lang);document.querySelectorAll('[data-i18n]').forEach(el=>{const val=tr(el.dataset.i18n);if(el.tagName==='INPUT'&&el.placeholder!==undefined&&el.getAttribute('data-i18n-attr')==='placeholder'){el.placeholder=val;}else{el.textContent=val;}});document.querySelectorAll('.lang-option').forEach(o=>{o.classList.toggle('active',o.dataset.lang===lang);});const flagEl=document.getElementById('lang-flag');const flags={en:'🇬🇧',ru:'🇷🇺',de:'🇩🇪',zh:'🇨🇳',es:'🇪🇸'};if(flagEl)flagEl.textContent=flags[lang]||'🇬🇧';if(typeof appInitialized!=='undefined'&&appInitialized){if(typeof fetchKeys==='function'){CacheManager.invalidate('keys_list');fetchKeys();}if(typeof fetchPasswords==='function'){CacheManager.invalidate('passwords_list');fetchPasswords();}}}(function initLangSwitcher(){const flag=document.getElementById('lang-flag');const dropdown=document.getElementById('lang-dropdown');if(!flag||!dropdown)return;flag.addEventListener('click',function(e){e.stopPropagation();dropdown.style.display=dropdown.style.display==='none'?'block':'none';});dropdown.querySelectorAll('.lang-option').forEach(function(opt){opt.addEventListener('click',function(e){e.stopPropagation();const lang=opt.dataset.lang;dropdown.style.display='none';loadLang(lang);});});document.addEventListener('click',function(){dropdown.style.display='none';});})();async function updateBatteryWidget() {
+const i18n={ru:{"app.title":"Панель управления","tab.keys":"Ключи","tab.passwords":"Пароли","tab.display":"Экран","tab.pin":"PIN","tab.settings":"Настройки","keys.title":"Управление ключами","keys.add.title":"Добавить ключ","keys.add.btn":"Добавить ключ","keys.current.title":"Текущие ключи","keys.importexport.title":"Импорт/Экспорт ключей","keys.advanced":"Расширенные настройки","keys.hotp.sync":"Счётчики HOTP синхронизируются вместе с TOTP ключами","keys.api.status":"Статус API:","keys.api.inactive":"Неактивен","keys.add.success":"✅ Ключ успешно добавлен!","keys.remove.success":"Ключ удалён!","keys.order.saved":"Порядок ключей сохранён!","keys.api.enabled":"Доступ к API открыт на 5 минут.","keys.hotp.generated":"✅ Код HOTP сгенерирован","keys.copied":"TOTP код скопирован!","keys.hotp_copied":"HOTP код скопирован!","ui.loading":"Загрузка...","keys.col.name":"Имя","keys.col.code":"Код","keys.col.timer":"Таймер","keys.col.progress":"Прогресс","keys.col.actions":"Действия","keys.btn.remove":"Удалить","keys.btn.next":"🔄 След","keys.api.enable":"Включить API (5 мин)","keys.field.name":"Имя:","keys.field.secret":"Секрет (Base32):","keys.field.algorithm":"Алгоритм:","keys.type.totp":"TOTP (на основе времени)","keys.type.hotp":"HOTP (на основе счётчика)","keys.digits.6":"6 цифр","keys.digits.8":"8 цифр","keys.period.30":"30 секунд","keys.period.60":"60 секунд","keys.field.digits":"Цифры:","keys.field.period":"Период:","keys.algo.sha1":"SHA1 (Стандарт)","passwords.title":"Управление паролями","passwords.add.title":"Добавить пароль","passwords.field.name":"Имя:","passwords.field.password":"Пароль:","passwords.add.btn":"Добавить пароль","passwords.current.title":"Текущие пароли","passwords.col.name":"Имя","passwords.col.actions":"Действия","passwords.btn.copy":"Копировать","passwords.btn.edit":"Изменить","passwords.btn.remove":"Удалить","passwords.copied":"Пароль скопирован!","passwords.updated":"Пароль обновлён!","passwords.removed":"Пароль удалён!","passwords.added":"Пароль добавлен!","passwords.order.saved":"Порядок паролей сохранён!","passwords.order.failed":"Ошибка сохранения порядка паролей.","passwords.gen.title":"Генератор паролей","passwords.gen.desc":"Выберите длину и сгенерируйте надёжный пароль","passwords.gen.generated":"Сгенерированный пароль:","passwords.gen.btn.generate":"Сгенерировать","passwords.gen.btn.use":"Использовать пароль","passwords.edit.title":"Редактировать пароль","passwords.edit.desc":"Изменить имя и пароль для этой записи","passwords.edit.name":"Имя:","passwords.edit.password":"Пароль:","passwords.edit.btn.save":"Сохранить","passwords.edit.btn.cancel":"Отмена","passwords.strength.weak":"Слабый пароль","passwords.strength.medium":"Средний пароль","passwords.strength.strong":"Надёжный пароль","passwords.strength.encryption":"Ключ шифрования","passwords.importexport.title":"Импорт/Экспорт паролей","passwords.btn.export":"Экспорт паролей","passwords.btn.import":"Импорт паролей","passwords.gen.length":"Длина пароля:","passwords.modal.confirm":"Подтвердить","passwords.export.title":"Подтверждение экспорта","passwords.export.desc":"Введите пароль администратора для шифрования и экспорта паролей.","passwords.import.title":"Подтверждение импорта","passwords.import.desc":"Введите пароль администратора для расшифровки и импорта паролей.","system.shutdown.desc":"Веб-сервер автоматически отключится из-за неактивности.","system.shutdown.remaining":"Осталось:","display.title":"Настройки экрана","display.theme.saved":"Тема успешно применена!","display.theme.title":"Выбор темы","display.theme.light":"Светлая тема","display.theme.dark":"Тёмная тема","display.theme.btn":"Применить тему","display.splash.title":"Заставка","display.splash.label":"Режим встроенной заставки:","display.splash.disabled":"Отключено (без заставки)","display.splash.btn":"Сохранить","display.splash.saved":"Режим заставки сохранён! Перезагрузите устройство.","display.splash.select":"Выберите режим заставки","display.clock.title":"Настройки часов","display.clock.timezone":"Часовой пояс:","display.clock.save.tz":"Сохранить часовой пояс","display.clock.tz.saved":"Часовой пояс сохранён! Применено немедленно.","display.clock.tz.select":"Выберите часовой пояс","display.rtc.title":"Модуль DS3231 RTC","display.rtc.desc":"Аппаратные часы для офлайн/AP режима","display.rtc.sda":"Пин SDA","display.rtc.scl":"Пин SCL","display.rtc.btn":"Синхронизировать и сохранить","display.rtc.saving":"Сохранение...","display.rtc.saved":"Настройки RTC сохранены","display.rtc.status.notfound":"Не найдено","display.rtc.status.check":"Проверьте пины I2C","display.rtc.status.drifted":"Дрейф времени","display.rtc.status.ok":"ОК","display.rtc.hint.ntp":"Время синхронизируется с NTP при следующей загрузке с WiFi.","display.rtc.hint.browser":"Время синхронизируется с часами браузера при сохранении.","display.lock.title":"Экран и блокировка","display.lock.screen.label":"Тайм-аут экрана (выключить дисплей через):","display.lock.auto.label":"Автоблокировка (глубокий сон + PIN через):","display.lock.dim.label":"Авто-затемнение (снизить яркость до 20% через):","display.lock.opt.5s":"5 секунд","display.lock.opt.10s":"10 секунд","display.lock.warning":"Порядок должен соблюдаться: авто-затемнение < тайм-аут экрана ≤ автоблокировка (когда каждый включён).","display.lock.btn":"Сохранить настройки","display.lock.saved":"Настройки экрана успешно сохранены!","display.lock.error.order":"Тайм-аут автоблокировки должен быть больше тайм-аута экрана!","display.lock.never":"Никогда","display.lock.opt.15s":"15 секунд","display.lock.opt.30s":"30 секунд","display.lock.opt.1m":"1 минута","display.lock.opt.5m":"5 минут","display.lock.opt.15m":"15 минут","display.lock.opt.30m":"30 минут","display.lock.opt.1h":"1 час","display.lock.opt.4h":"4 часа","pin.title":"Настройки PIN-кода","pin.startup.label":"PIN при запуске","pin.startup.desc":"Шифровать ключ устройства с PIN при запуске","pin.startup.btn":"Сохранить настройки PIN","pin.cancelled":"Изменение PIN отменено.","pin.reset.cancelled":"Сброс отменён.","pin.rebooting":"Устройство перезагружается... Подождите.","pin.ble.title":"PIN для BLE-сопряжения","pin.ble.notice":"Этот PIN отображается на экране устройства во время BLE-сопряжения для аутентификации клиента.","pin.ble.label.new":"Новый PIN для BLE (6 цифр):","pin.ble.label.confirm":"Подтвердите PIN для BLE:","pin.ble.important":"Этот PIN будет отображаться на экране ESP32 во время BLE-сопряжения для ввода клиентом.","pin.ble.btn":"Обновить PIN для BLE","pin.ble.saved":"PIN для BLE обновлён! Все BLE-клиенты отключены.","pin.ble.error.digits":"PIN для BLE должен быть ровно 6 цифр!","pin.ble.error.match":"PIN для BLE не совпадают!","pin.placeholder.enter":"Введите 6-значный PIN","pin.placeholder.confirm":"Подтвердите 6-значный PIN","pin.device.title":"PIN устройства BLE","pin.device.notice":"Этот PIN требуется на аппаратном устройстве при передаче паролей через BLE.","pin.device.label.enable":"Включить PIN устройства BLE","pin.device.desc":"Требовать PIN на устройстве для передачи паролей через BLE","pin.device.label.new":"Новый PIN устройства BLE (6 цифр):","pin.device.label.confirm":"Подтвердите PIN устройства BLE:","pin.device.important":"Этот PIN будет требоваться на экране устройства при передаче паролей через BLE.","pin.device.btn":"Сохранить PIN устройства BLE","pin.device.saved":"PIN устройства BLE обновлён!","pin.device.disabled":"PIN устройства BLE отключён","pin.device.error.enable":"Сначала включите PIN устройства BLE","pin.device.error.digits":"PIN устройства BLE должен быть ровно 6 цифр!","pin.device.error.match":"PIN устройства BLE не совпадают!","pin.duress.title":"Пин-код уничтожения","pin.duress.notice":"При вводе этого PIN все данные будут необратимо уничтожены.","pin.duress.label.enable":"Включить пин-код уничтожения","pin.duress.desc":"Отдельный PIN, стирающий устройство при вводе","pin.duress.label.new":"Новый пин-код уничтожения (длина как у стартап-пина):","pin.duress.label.confirm":"Подтвердите пин-код уничтожения:","pin.duress.placeholder.enter":"Введите пин-код","pin.duress.placeholder.confirm":"Подтвердите пин-код","pin.duress.important":"Этот PIN должен отличаться от основного. Ввод немедленно уничтожит все данные.","pin.duress.btn":"Сохранить пин-код уничтожения","pin.duress.saved":"Пин-код уничтожения сохранён","pin.duress.disabled":"Пин-код уничтожения отключён","pin.duress.error.enable":"Сначала включите переключатель","pin.duress.error.digits":"Длина PIN должна совпадать с длиной стартап-пина","pin.duress.error.match":"PIN-коды не совпадают","settings.title":"Настройки устройства","settings.pwd.title":"Управление паролями","settings.pwd.toggle.web":"Веб-кабинет","settings.pwd.toggle.wifi":"Точка доступа WiFi","settings.pwd.web.form.title":"Сменить пароль веб-кабинета","settings.pwd.web.desc":"Сменить пароль для доступа к этому веб-интерфейсу.","settings.pwd.current.login":"Текущий логин:","settings.pwd.web.new.label":"Новый пароль веб-кабинета","settings.pwd.web.confirm.label":"Подтвердите новый пароль","settings.pwd.req.length":"Минимум 8 символов","settings.pwd.req.upper":"Заглавная буква","settings.pwd.req.lower":"Строчная буква","settings.pwd.req.number":"Цифра","settings.pwd.req.special":"Специальный символ (!@#$%)","settings.pwd.req.nousername":"Пароль не должен содержать логин","settings.pwd.web.btn":"Сменить пароль","settings.pwd.wifi.form.title":"Сменить пароль точки доступа WiFi","settings.pwd.wifi.desc":"Сменить пароль точки доступа WiFi в режиме AP.","settings.pwd.wifi.new.label":"Новый пароль WiFi AP","settings.pwd.wifi.confirm.label":"Подтвердите новый пароль WiFi AP","settings.pwd.wifi.btn":"Сменить пароль WiFi","settings.pwd.err.match":"Пароли не совпадают!","settings.pwd.err.requirements":"Пароль не соответствует требованиям!","settings.pwd.err.wifi.short":"Пароль WiFi должен быть не менее 8 символов!","settings.pwd.web.saved":"Пароль успешно изменён!","settings.pwd.wifi.saved":"Пароль AP изменён. Устройство перезагружается.","settings.pwd.wifi.restarted":"Устройство перезагружено. Подключитесь к WiFi AP с новым паролем.","settings.pwd.match":"Пароли совпадают!","settings.ble.title":"Настройки Bluetooth","settings.ble.label":"Имя BLE устройства (макс. 15 символов):","settings.ble.btn":"Сохранить имя BLE","settings.ble.saved":"Имя BLE устройства обновлено!","settings.mdns.title":"Настройки mDNS","settings.mdns.label":"Имя хоста mDNS (напр., 't-disp-totp'):","settings.mdns.btn":"Сохранить имя хоста mDNS","settings.mdns.saved":"Имя хоста mDNS обновлено!","settings.wifi.title":"📶 Сеть WiFi","settings.wifi.ssid.label":"SSID сети","settings.wifi.ssid.placeholder":"Название сети WiFi","settings.wifi.pwd.label":"Пароль","settings.wifi.pwd.placeholder":"Пароль WiFi (мин. 8 символов)","settings.wifi.confirm.label":"Подтвердите пароль","settings.wifi.confirm.placeholder":"Повторите пароль","settings.wifi.btn":"Сохранить данные WiFi","settings.wifi.note":"⚠ Изменения применятся после перезагрузки.","settings.wifi.err.ssid":"SSID обязателен.","settings.wifi.err.match":"Пароли не совпадают.","settings.wifi.err.short":"Пароль должен быть не менее 8 символов.","settings.wifi.err.failed":"Запрос не выполнен.","settings.wifi.saved":"Данные WiFi сохранены!","settings.scan.scanning":"⏳ Сканирование...","settings.scan.btn":"📡 Сканировать","settings.scan.failed":"Сканирование не удалось","settings.startup.title":"Режим запуска","settings.startup.label":"Режим по умолчанию при запуске:","settings.startup.opt.totp":"TOTP-аутентификатор","settings.startup.opt.pwd":"Менеджер паролей","settings.startup.btn":"Сохранить режим запуска","settings.startup.saved":"Режим запуска успешно сохранён!","settings.boot.title":"Режим загрузки","settings.boot.label":"Сетевой режим по умолчанию при загрузке:","settings.boot.opt.wifi":"Режим WiFi","settings.boot.opt.ap":"Режим AP","settings.boot.opt.offline":"Автономный режим","settings.boot.note":"Переопределение доступно кнопками при загрузке (окно 2 сек).","settings.boot.btn":"Сохранить режим загрузки","settings.boot.saving":"Сохранение...","settings.boot.saved":"Режим загрузки сохранён! Применится при следующей перезагрузке.","settings.hid.title":"Режим HID отправки","settings.hid.label":"Режим по умолчанию при отправке пароля:","settings.hid.opt.ble":"BLE (авто) / USB через BTN2","settings.hid.opt.usb":"USB (авто) / BLE через BTN1","settings.hid.note":"Переключение доступно кнопками в течение 3 сек.","settings.hid.btn":"Сохранить режим HID","settings.hid.saving":"Сохранение...","settings.hid.saved":"Режим HID сохранён.","settings.hid.error":"Ошибка сохранения режима HID.","settings.webserver.title":"Веб-сервер","settings.webserver.label":"Автовыключение при неактивности (Режим WiFi):","settings.webserver.opt.5m":"5 минут","settings.webserver.opt.10m":"10 минут","settings.webserver.opt.1h":"1 час","settings.webserver.opt.never":"Никогда","settings.webserver.btn":"Сохранить","settings.webserver.saving":"Сохранение настроек и перезапуск устройства...","settings.session.title":"Таймер автовыхода","settings.session.label":"Время сессии:","settings.session.opt.reboot":"До перезагрузки устройства","settings.session.opt.1h":"1 час","settings.session.opt.6h":"6 часов (по умолчанию)","settings.session.opt.24h":"24 часа","settings.session.opt.3d":"3 дня","settings.session.notice":"Управляет временем автовыхода для безопасности. Сессии сохраняются при перезагрузке, кроме режима «До перезагрузки», который требует повторного входа. Длинные сессии удобны, но снижают безопасность при потере устройства.","settings.session.btn":"Сохранить таймер автовыхода","settings.session.info.reboot":"Сессии будут истекать при перезагрузке устройства.","settings.session.info.1h":"Сессии будут истекать через 1 час.","settings.session.info.6h":"Сессии будут истекать через 6 часов.","settings.session.info.24h":"Сессии будут истекать через 24 часа.","settings.session.info.3d":"Сессии будут истекать через 3 дня.","settings.session.info.fallback":"Длительность сессии обновлена.","settings.session.err":"Не удалось обновить длительность сессии.","settings.system.title":"Система","settings.system.reboot":"Перезагрузить устройство","settings.system.reboot.web":"Перезагрузить с веб-сервером","settings.system.ble.clear":"Очистить BLE-клиенты","settings.system.logout":"Выйти","settings.system.ble.cleared":"BLE-клиенты успешно очищены!","settings.system.rebooting.web":"Перезагрузка с включённым веб-сервером...","settings.system.rebooting":"Перезагрузка...","system.shutdown.title":"Сессия истекает","system.shutdown.btn":"Продолжить сессию","system.shutdown.shutdown.title":"Сервер отключается","system.shutdown.shutdown.desc":"Сервер отключился из-за неактивности. Для доступа перезагрузите устройство.","passwords.modal.password":"Пароль:","passwords.export.success":"Экспорт выполнен успешно!","passwords.import.success":"Импорт выполнен успешно!","keys.api.active":"Активен ({s}с осталось)","keys.btn.export":"Экспорт ключей","keys.btn.import":"Импорт ключей","keys.export.title":"Подтверждение экспорта","keys.export.desc":"Введите пароль администратора для шифрования и экспорта данных.","keys.import.title":"Подтверждение импорта","keys.import.desc":"Введите пароль администратора для расшифровки и импорта файла. Существующие данные будут перезаписаны.","passwords.cat.all":"Все","passwords.cat.web":"Веб","passwords.cat.app":"Приложение","passwords.cat.local":"Локальный","passwords.cat.key":"Ключ / Токен","passwords.cat.label":"Категория","passwords.cat.none":"Без категории"},de:{"app.title":"Authentifikator-Systemsteuerung","tab.keys":"Schlüssel","tab.passwords":"Passwörter","tab.display":"Anzeige","tab.pin":"PIN","tab.settings":"Einstellungen","keys.title":"Schlüssel verwalten","keys.add.title":"Neuen Schlüssel hinzufügen","keys.add.btn":"Schlüssel hinzufügen","keys.current.title":"Aktuelle Schlüssel","keys.importexport.title":"Schlüssel importieren/exportieren","keys.advanced":"Erweiterte Einstellungen","keys.hotp.sync":"HOTP-Zähler werden zusammen mit TOTP-Schlüsseln synchronisiert","keys.api.status":"API-Status:","keys.api.inactive":"Inaktiv","keys.add.success":"✅ Schlüssel erfolgreich hinzugefügt!","keys.remove.success":"Schlüssel entfernt!","keys.order.saved":"Schlüsselreihenfolge gespeichert!","keys.api.enabled":"API-Zugriff für 5 Minuten aktiviert.","keys.hotp.generated":"✅ HOTP-Code generiert","keys.copied":"TOTP-Code kopiert!","keys.hotp_copied":"HOTP-Code kopiert!","ui.loading":"Laden...","keys.col.name":"Name","keys.col.code":"Code","keys.col.timer":"Timer","keys.col.progress":"Fortschritt","keys.col.actions":"Aktionen","keys.btn.remove":"Entfernen","keys.btn.next":"🔄 Weiter","keys.api.enable":"API aktivieren (5 Min)","keys.field.name":"Name:","keys.field.secret":"Geheimnis (Base32):","keys.field.algorithm":"Algorithmus:","keys.type.totp":"TOTP (zeitbasiert)","keys.type.hotp":"HOTP (zählerbasiert)","keys.digits.6":"6 Ziffern","keys.digits.8":"8 Ziffern","keys.period.30":"30 Sekunden","keys.period.60":"60 Sekunden","keys.field.digits":"Ziffern:","keys.field.period":"Zeitraum:","keys.algo.sha1":"SHA1 (Standard)","keys.api.active":"Aktiv (noch {s}s)","passwords.title":"Passwörter verwalten","passwords.add.title":"Neues Passwort hinzufügen","passwords.field.name":"Name:","passwords.field.password":"Passwort:","passwords.add.btn":"Passwort hinzufügen","passwords.current.title":"Aktuelle Passwörter","passwords.col.name":"Name","passwords.col.actions":"Aktionen","passwords.btn.copy":"Kopieren","passwords.btn.edit":"Bearbeiten","passwords.btn.remove":"Entfernen","passwords.copied":"Passwort kopiert!","passwords.updated":"Passwort aktualisiert!","passwords.removed":"Passwort entfernt!","passwords.added":"Passwort hinzugefügt!","passwords.order.saved":"Passwortreihenfolge gespeichert!","passwords.order.failed":"Fehler beim Speichern der Reihenfolge.","passwords.gen.title":"Passwort-Generator","passwords.gen.desc":"Wählen Sie eine Länge und generieren Sie ein sicheres Passwort","passwords.gen.generated":"Generiertes Passwort:","passwords.gen.btn.generate":"Generieren","passwords.gen.btn.use":"Dieses Passwort verwenden","passwords.edit.title":"Passwort bearbeiten","passwords.edit.desc":"Name und Passwort für diesen Eintrag ändern","passwords.edit.name":"Name:","passwords.edit.password":"Passwort:","passwords.edit.btn.save":"Speichern","passwords.edit.btn.cancel":"Abbrechen","passwords.strength.weak":"Schwaches Passwort","passwords.strength.medium":"Mittleres Passwort","passwords.strength.strong":"Starkes Passwort","passwords.strength.encryption":"Verschlüsselungsschlüssel","passwords.importexport.title":"Passwörter importieren/exportieren","passwords.btn.export":"Passwörter exportieren","passwords.btn.import":"Passwörter importieren","passwords.gen.length":"Passwortlänge:","passwords.modal.confirm":"Bestätigen","passwords.export.title":"Export bestätigen","passwords.export.desc":"Geben Sie Ihr Admin-Passwort ein, um die Passwörter zu verschlüsseln und zu exportieren.","passwords.import.title":"Import bestätigen","passwords.import.desc":"Geben Sie Ihr Admin-Passwort ein, um die Passwörter zu entschlüsseln und zu importieren.","system.shutdown.desc":"Der Webserver wird aufgrund von Inaktivität automatisch heruntergefahren.","system.shutdown.remaining":"Verbleibende Zeit:","display.title":"Anzeigeeinstellungen","display.theme.saved":"Design erfolgreich übernommen!","display.theme.title":"Themenauswahl","display.theme.light":"Helles Design","display.theme.dark":"Dunkles Design","display.theme.btn":"Design anwenden","display.splash.title":"Startbildschirm","display.splash.label":"Eingebetteter Startbildschirm-Modus:","display.splash.disabled":"Deaktiviert (kein Startbildschirm)","display.splash.btn":"Modus speichern","display.splash.saved":"Startbildschirm-Modus gespeichert! Neustart erforderlich.","display.splash.select":"Bitte Startbildschirm-Modus auswählen","display.clock.title":"Uhrzeitanzeige","display.clock.timezone":"Zeitzone:","display.clock.save.tz":"Zeitzone speichern","display.clock.tz.saved":"Zeitzone gespeichert! Sofort angewendet.","display.clock.tz.select":"Bitte Zeitzone auswählen","display.rtc.title":"DS3231-RTC-Modul","display.rtc.desc":"Hardwareuhr für Offline-/AP-Modus","display.rtc.sda":"SDA-Pin","display.rtc.scl":"SCL-Pin","display.rtc.btn":"Sync & Speichern","display.rtc.saving":"Speichern...","display.rtc.saved":"RTC-Einstellungen gespeichert","display.rtc.status.notfound":"Nicht gefunden","display.rtc.status.check":"I2C-Pins prüfen","display.rtc.status.drifted":"Zeitdrift","display.rtc.status.ok":"OK","display.rtc.hint.ntp":"Die Zeit wird beim nächsten WiFi-Start automatisch mit NTP synchronisiert.","display.rtc.hint.browser":"Die Zeit wird beim Speichern mit der Browseruhr synchronisiert.","display.lock.title":"Bildschirm & Sperre","display.lock.screen.label":"Bildschirm-Timeout (Display ausschalten nach):","display.lock.auto.label":"Automatische Sperre (Tiefschlaf + PIN nach):","display.lock.dim.label":"Auto-Dimmen (Helligkeit nach auf 20% reduzieren):","display.lock.opt.5s":"5 Sekunden","display.lock.opt.10s":"10 Sekunden","display.lock.warning":"Reihenfolge beachten: Auto-Dimmen < Bildschirm-Timeout ≤ automatische Sperre (wenn jeweils aktiviert).","display.lock.btn":"Einstellungen speichern","display.lock.saved":"Anzeigeeinstellungen erfolgreich gespeichert!","display.lock.error.order":"Der Auto-Sperr-Timeout muss größer als der Bildschirm-Timeout sein!","display.lock.never":"Nie","display.lock.opt.15s":"15 Sekunden","display.lock.opt.30s":"30 Sekunden","display.lock.opt.1m":"1 Minute","display.lock.opt.5m":"5 Minuten","display.lock.opt.15m":"15 Minuten","display.lock.opt.30m":"30 Minuten","display.lock.opt.1h":"1 Stunde","display.lock.opt.4h":"4 Stunden","pin.title":"PIN-Code-Einstellungen","pin.startup.label":"Start-PIN","pin.startup.desc":"Geräteschlüssel beim Start mit PIN verschlüsseln","pin.startup.btn":"Start-PIN-Einstellungen speichern","pin.cancelled":"PIN-Änderung abgebrochen.","pin.reset.cancelled":"Zurücksetzen abgebrochen.","pin.rebooting":"Gerät wird neu gestartet... Bitte warten.","pin.ble.title":"BLE-Kopplungs-PIN","pin.ble.notice":"Dieser PIN wird beim BLE-Koppeln zur Client-Authentifizierung auf dem Gerät angezeigt.","pin.ble.label.new":"Neuer BLE-Kopplungs-PIN (6 Ziffern):","pin.ble.label.confirm":"BLE-Kopplungs-PIN bestätigen:","pin.ble.important":"Dieser PIN wird beim BLE-Koppeln auf dem ESP32-Bildschirm zur Eingabe durch den Client angezeigt.","pin.ble.btn":"BLE-Kopplungs-PIN aktualisieren","pin.ble.saved":"BLE-Kopplungs-PIN aktualisiert! Alle BLE-Clients getrennt.","pin.ble.error.digits":"BLE-Kopplungs-PIN muss genau 6 Ziffern haben!","pin.ble.error.match":"BLE-Kopplungs-PINs stimmen nicht überein!","pin.placeholder.enter":"6-stelligen PIN eingeben","pin.placeholder.confirm":"6-stelligen PIN bestätigen","pin.device.title":"Geräte-BLE-PIN","pin.device.notice":"Dieser PIN wird auf dem Gerät beim Übertragen von Passwörtern über BLE benötigt.","pin.device.label.enable":"Geräte-BLE-PIN aktivieren","pin.device.desc":"PIN auf dem Gerät für BLE-Passwortübertragung erforderlich","pin.device.label.new":"Neuer Geräte-BLE-PIN (6 Ziffern):","pin.device.label.confirm":"Geräte-BLE-PIN bestätigen:","pin.device.important":"Dieser PIN wird auf dem Gerät beim Übertragen von Passwörtern über BLE benötigt.","pin.device.btn":"Geräte-BLE-PIN speichern","pin.device.saved":"Geräte-BLE-PIN aktualisiert!","pin.device.disabled":"Geräte-BLE-PIN deaktiviert","pin.device.error.enable":"Bitte zuerst Geräte-BLE-PIN aktivieren","pin.device.error.digits":"Geräte-BLE-PIN muss genau 6 Ziffern haben!","pin.device.error.match":"Geräte-BLE-PINs stimmen nicht überein!","pin.duress.title":"Notfall-PIN","pin.duress.notice":"Bei Eingabe dieses PINs werden alle Daten unwiederbringlich gelöscht.","pin.duress.label.enable":"Notfall-PIN aktivieren","pin.duress.desc":"Separater PIN, der das Gerät beim Eingeben löscht","pin.duress.label.new":"Neuer Notfall-PIN (gleiche Länge wie Start-PIN):","pin.duress.label.confirm":"Notfall-PIN bestätigen:","pin.duress.placeholder.enter":"Notfall-PIN eingeben","pin.duress.placeholder.confirm":"Notfall-PIN bestätigen","pin.duress.important":"Dieser PIN muss sich vom Haupt-PIN unterscheiden. Eingabe löscht sofort alle Daten.","pin.duress.btn":"Notfall-PIN speichern","pin.duress.saved":"Notfall-PIN gespeichert","pin.duress.disabled":"Notfall-PIN deaktiviert","pin.duress.error.enable":"Schalter zuerst aktivieren","pin.duress.error.digits":"PIN-Länge muss dem Start-PIN entsprechen","pin.duress.error.match":"PINs stimmen nicht überein","settings.title":"Geräteeinstellungen","settings.pwd.title":"Passwortverwaltung","settings.pwd.toggle.web":"Web-Kabinett","settings.pwd.toggle.wifi":"WLAN-Zugangspunkt","settings.pwd.web.form.title":"Web-Kabinett-Passwort ändern","settings.pwd.web.desc":"Passwort für den Zugriff auf diese Weboberfläche ändern.","settings.pwd.current.login":"Aktuelle Anmeldung:","settings.pwd.web.new.label":"Neues Web-Passwort","settings.pwd.web.confirm.label":"Neues Web-Passwort bestätigen","settings.pwd.req.length":"Mindestens 8 Zeichen","settings.pwd.req.upper":"Ein Großbuchstabe","settings.pwd.req.lower":"Ein Kleinbuchstabe","settings.pwd.req.number":"Eine Zahl","settings.pwd.req.special":"Ein Sonderzeichen (!@#$%)","settings.pwd.req.nousername":"Passwort darf keinen Benutzernamen enthalten","settings.pwd.web.btn":"Passwort ändern","settings.pwd.wifi.form.title":"WLAN-Zugangspunkt-Passwort ändern","settings.pwd.wifi.desc":"Passwort für den WLAN-Zugangspunkt im AP-Modus ändern.","settings.pwd.wifi.new.label":"Neues WLAN-AP-Passwort","settings.pwd.wifi.confirm.label":"Neues WLAN-AP-Passwort bestätigen","settings.pwd.wifi.btn":"WLAN-Passwort ändern","settings.pwd.err.match":"Passwörter stimmen nicht überein!","settings.pwd.err.requirements":"Passwort erfüllt die Anforderungen nicht!","settings.pwd.err.wifi.short":"WLAN-Passwort muss mindestens 8 Zeichen haben!","settings.pwd.web.saved":"Passwort erfolgreich geändert!","settings.pwd.wifi.saved":"AP-Passwort geändert. Gerät wird neu gestartet.","settings.pwd.wifi.restarted":"Gerät neu gestartet. Mit neuem Passwort mit WLAN-AP verbinden.","settings.pwd.match":"Passwörter stimmen überein!","settings.ble.title":"Bluetooth-Einstellungen","settings.ble.label":"BLE-Gerätename (max. 15 Zeichen):","settings.ble.btn":"BLE-Name speichern","settings.ble.saved":"BLE-Gerätename aktualisiert!","settings.mdns.title":"mDNS-Einstellungen","settings.mdns.label":"mDNS-Hostname (z.B. 't-disp-totp'):","settings.mdns.btn":"mDNS-Hostname speichern","settings.mdns.saved":"mDNS-Hostname aktualisiert!","settings.wifi.title":"📶 WLAN-Netzwerk","settings.wifi.ssid.label":"Netzwerk-SSID","settings.wifi.ssid.placeholder":"WLAN-Netzwerkname","settings.wifi.pwd.label":"Passwort","settings.wifi.pwd.placeholder":"WLAN-Passwort (min. 8 Zeichen)","settings.wifi.confirm.label":"Passwort bestätigen","settings.wifi.confirm.placeholder":"Passwort wiederholen","settings.wifi.btn":"WLAN-Zugangsdaten speichern","settings.wifi.note":"⚠ Änderungen werden nach dem Neustart angewendet.","settings.wifi.err.ssid":"SSID ist erforderlich.","settings.wifi.err.match":"Passwörter stimmen nicht überein.","settings.wifi.err.short":"Passwort muss mindestens 8 Zeichen haben.","settings.wifi.err.failed":"Anfrage fehlgeschlagen.","settings.wifi.saved":"WLAN-Zugangsdaten gespeichert!","settings.scan.scanning":"⏳ Scannen...","settings.scan.btn":"📡 Scannen","settings.scan.failed":"Scan fehlgeschlagen","settings.startup.title":"Startmodus","settings.startup.label":"Standardmodus beim Start:","settings.startup.opt.totp":"TOTP-Authentifikator","settings.startup.opt.pwd":"Passwort-Manager","settings.startup.btn":"Startmodus speichern","settings.startup.saved":"Startmodus erfolgreich gespeichert!","settings.boot.title":"Boot-Modus","settings.boot.label":"Standard-Netzwerkmodus beim Booten:","settings.boot.opt.wifi":"WLAN-Modus","settings.boot.opt.ap":"AP-Modus","settings.boot.opt.offline":"Offline-Modus","settings.boot.note":"Überschreibung über Tasten beim Booten möglich (2-Sek.-Fenster).","settings.boot.btn":"Boot-Modus speichern","settings.boot.saving":"Speichern...","settings.boot.saved":"Boot-Modus gespeichert! Wird beim nächsten Neustart angewendet.","settings.hid.title":"HID-Sendemodus","settings.hid.label":"Standardmodus beim Senden des Passworts:","settings.hid.opt.ble":"BLE (auto) / USB über BTN2","settings.hid.opt.usb":"USB (auto) / BLE über BTN1","settings.hid.note":"Überschreibung per Tasten während 3s möglich.","settings.hid.btn":"HID-Modus speichern","settings.hid.saving":"Speichern...","settings.hid.saved":"HID-Modus gespeichert.","settings.hid.error":"Fehler beim Speichern des HID-Modus.","settings.webserver.title":"Webserver","settings.webserver.label":"Automatisches Herunterfahren bei Inaktivität (WiFi-Modus):","settings.webserver.opt.5m":"5 Minuten","settings.webserver.opt.10m":"10 Minuten","settings.webserver.opt.1h":"1 Stunde","settings.webserver.opt.never":"Nie","settings.webserver.btn":"Einstellung speichern","settings.webserver.saving":"Einstellungen werden gespeichert und Gerät neu gestartet...","settings.session.title":"Auto-Abmelde-Timer","settings.session.label":"Angemeldete Sitzungsdauer:","settings.session.opt.reboot":"Bis zum Geräte-Neustart","settings.session.opt.1h":"1 Stunde","settings.session.opt.6h":"6 Stunden (Standard)","settings.session.opt.24h":"24 Stunden","settings.session.opt.3d":"3 Tage","settings.session.notice":"Steuert die automatische Abmeldezeit für erhöhte Sicherheit. Sitzungen überleben Neustarts, außer im Modus «Bis Neustart», der nach dem Einschalten eine neue Anmeldung erfordert. Längere Sitzungen reduzieren die Anmeldefrequenz, können aber die Sicherheit bei Geräteverlust gefährden.","settings.session.btn":"Auto-Abmelde-Timer speichern","settings.session.info.reboot":"Sitzungen laufen jetzt beim Geräte-Neustart ab.","settings.session.info.1h":"Sitzungen laufen jetzt nach 1 Stunde ab.","settings.session.info.6h":"Sitzungen laufen jetzt nach 6 Stunden ab.","settings.session.info.24h":"Sitzungen laufen jetzt nach 24 Stunden ab.","settings.session.info.3d":"Sitzungen laufen jetzt nach 3 Tagen ab.","settings.session.info.fallback":"Sitzungsdauer aktualisiert.","settings.session.err":"Sitzungsdauer konnte nicht aktualisiert werden.","settings.system.title":"System","settings.system.reboot":"Gerät neu starten","settings.system.reboot.web":"Mit Webserver neu starten","settings.system.ble.clear":"BLE-Clients löschen","settings.system.logout":"Abmelden","settings.system.ble.cleared":"BLE-Clients erfolgreich gelöscht!","settings.system.rebooting.web":"Neustart mit aktiviertem Webserver...","settings.system.rebooting":"Neustart...","system.shutdown.title":"Sitzungs-Timeout","system.shutdown.btn":"Sitzung fortsetzen","system.shutdown.shutdown.title":"Server wird heruntergefahren","system.shutdown.shutdown.desc":"Der Server wurde aufgrund von Inaktivität heruntergefahren. Bitte starten Sie das Gerät neu.","passwords.modal.password":"Passwort:","passwords.export.success":"Export erfolgreich!","passwords.import.success":"Import erfolgreich!","keys.btn.export":"Schlüssel exportieren","keys.btn.import":"Schlüssel importieren","keys.export.title":"Export bestätigen","keys.export.desc":"Geben Sie Ihr Admin-Passwort ein, um die Daten zu verschlüsseln und zu exportieren.","keys.import.title":"Import bestätigen","keys.import.desc":"Geben Sie Ihr Admin-Passwort ein, um die Datei zu entschlüsseln und zu importieren. Bestehende Daten werden überschrieben.","passwords.cat.all":"Alle","passwords.cat.web":"Web","passwords.cat.app":"App","passwords.cat.local":"Lokal","passwords.cat.key":"Schlüssel / Token","passwords.cat.label":"Kategorie","passwords.cat.none":"Keine Kategorie"},zh:{"app.title":"验证器控制面板","tab.keys":"密钥","tab.passwords":"密码","tab.display":"显示","tab.pin":"PIN码","tab.settings":"设置","keys.title":"管理密钥","keys.add.title":"添加新密钥","keys.add.btn":"添加密钥","keys.current.title":"当前密钥","keys.importexport.title":"导入/导出密钥","keys.advanced":"高级设置","keys.hotp.sync":"HOTP计数器与TOTP密钥同步","keys.api.status":"API状态:","keys.api.inactive":"未激活","keys.add.success":"✅ 密钥添加成功！","keys.remove.success":"密钥已删除！","keys.order.saved":"密钥顺序已保存！","keys.api.enabled":"API访问已开放5分钟。","keys.hotp.generated":"✅ 已生成HOTP代码","keys.copied":"TOTP代码已复制！","keys.hotp_copied":"HOTP代码已复制！","ui.loading":"加载中...","keys.col.name":"名称","keys.col.code":"代码","keys.col.timer":"计时器","keys.col.progress":"进度","keys.col.actions":"操作","keys.btn.remove":"删除","keys.btn.next":"🔄 下一个","keys.api.enable":"启用API (5分钟)","keys.field.name":"名称:","keys.field.secret":"密钥 (Base32):","keys.field.algorithm":"算法:","keys.type.totp":"TOTP (基于时间)","keys.type.hotp":"HOTP (基于计数器)","keys.digits.6":"6位数字","keys.digits.8":"8位数字","keys.period.30":"30秒","keys.period.60":"60秒","keys.field.digits":"位数:","keys.field.period":"周期:","keys.algo.sha1":"SHA1 (标准)","passwords.title":"管理密码","passwords.add.title":"添加新密码","passwords.field.name":"名称:","passwords.field.password":"密码:","passwords.add.btn":"添加密码","passwords.current.title":"当前密码","passwords.col.name":"名称","passwords.col.actions":"操作","passwords.btn.copy":"复制","passwords.btn.edit":"编辑","passwords.btn.remove":"删除","passwords.copied":"密码已复制！","passwords.updated":"密码已更新！","passwords.removed":"密码已删除！","passwords.added":"密码已添加！","passwords.order.saved":"密码顺序已保存！","passwords.order.failed":"保存密码顺序失败。","passwords.gen.title":"密码生成器","passwords.gen.desc":"选择密码长度并生成安全密码","passwords.gen.generated":"生成的密码:","passwords.gen.btn.generate":"立即生成","passwords.gen.btn.use":"使用此密码","passwords.edit.title":"编辑密码","passwords.edit.desc":"更改此条目的名称和密码","passwords.edit.name":"名称:","passwords.edit.password":"密码:","passwords.edit.btn.save":"保存","passwords.edit.btn.cancel":"取消","passwords.strength.weak":"弱密码","passwords.strength.medium":"中等密码","passwords.strength.strong":"强密码","passwords.strength.encryption":"加密密钥","passwords.importexport.title":"导入/导出密码","passwords.btn.export":"导出密码","passwords.btn.import":"导入密码","passwords.gen.length":"密码长度:","passwords.modal.confirm":"确认","passwords.export.title":"确认导出","passwords.export.desc":"请输入管理员密码以加密并导出密码。","passwords.import.title":"确认导入","passwords.import.desc":"请输入管理员密码以解密并导入密码。","system.shutdown.desc":"由于不活动，Web服务器将自动关闭。","system.shutdown.remaining":"剩余时间:","display.title":"显示设置","display.theme.saved":"主题已成功应用！","display.theme.title":"主题选择","display.theme.light":"浅色主题","display.theme.dark":"深色主题","display.theme.btn":"应用主题","display.splash.title":"启动画面","display.splash.label":"内置启动画面模式:","display.splash.disabled":"禁用（无启动画面）","display.splash.btn":"保存模式","display.splash.saved":"启动画面模式已保存！重启后生效。","display.splash.select":"请选择启动画面模式","display.clock.title":"时钟显示","display.clock.timezone":"时区:","display.clock.save.tz":"保存时区","display.clock.tz.saved":"时区已保存！立即生效。","display.clock.tz.select":"请选择时区","display.rtc.title":"DS3231 RTC模块","display.rtc.desc":"用于离线/AP模式的硬件时钟","display.rtc.sda":"SDA引脚","display.rtc.scl":"SCL引脚","display.rtc.btn":"同步并保存","display.rtc.saving":"保存中...","display.rtc.saved":"RTC设置已保存","display.rtc.status.notfound":"未找到","display.rtc.status.check":"检查I2C引脚","display.rtc.status.drifted":"时间偏差","display.rtc.status.ok":"正常","display.rtc.hint.ntp":"下次WiFi启动时将自动从NTP同步时间。","display.rtc.hint.browser":"保存时将从浏览器时钟同步时间。","display.lock.title":"屏幕与锁定","display.lock.screen.label":"屏幕超时（关闭显示后）：","display.lock.auto.label":"自动锁定（深度睡眠+PIN后）：","display.lock.dim.label":"自动调暗（之后将亮度降至20%）：","display.lock.opt.5s":"5秒","display.lock.opt.10s":"10秒","display.lock.warning":"顺序须满足：自动调暗 < 屏幕超时 ≤ 自动锁定（各项启用时）。","display.lock.btn":"保存设置","display.lock.saved":"显示设置保存成功！","display.lock.error.order":"自动锁定超时必须大于屏幕超时！","display.lock.never":"从不","display.lock.opt.15s":"15秒","display.lock.opt.30s":"30秒","display.lock.opt.1m":"1分钟","display.lock.opt.5m":"5分钟","display.lock.opt.15m":"15分钟","display.lock.opt.30m":"30分钟","display.lock.opt.1h":"1小时","display.lock.opt.4h":"4小时","pin.title":"PIN码设置","pin.startup.label":"启动PIN","pin.startup.desc":"启动时使用PIN加密设备密钥","pin.startup.btn":"保存启动PIN设置","pin.cancelled":"PIN设置更改已取消。","pin.reset.cancelled":"重置已取消。","pin.rebooting":"设备正在重启... 请稍候。","pin.ble.title":"BLE配对PIN","pin.ble.notice":"此PIN在BLE配对时显示在设备屏幕上用于客户端验证。","pin.ble.label.new":"新BLE配对PIN（6位数字）：","pin.ble.label.confirm":"确认BLE配对PIN：","pin.ble.important":"此PIN将在BLE配对时显示在ESP32屏幕上供客户端输入。","pin.ble.btn":"更新BLE配对PIN","pin.ble.saved":"BLE配对PIN已更新！所有BLE客户端已断开。","pin.ble.error.digits":"BLE配对PIN必须恰好6位数字！","pin.ble.error.match":"BLE配对PIN不匹配！","pin.placeholder.enter":"输入6位PIN","pin.placeholder.confirm":"确认6位PIN","pin.device.title":"设备BLE PIN","pin.device.notice":"通过BLE传输密码时需要在硬件设备上输入此PIN。","pin.device.label.enable":"启用设备BLE PIN","pin.device.desc":"通过BLE传输密码时需要在设备上输入PIN","pin.device.label.new":"新设备BLE PIN（6位数字）：","pin.device.label.confirm":"确认设备BLE PIN：","pin.device.important":"通过BLE传输密码时需要在设备屏幕上输入此PIN。","pin.device.btn":"保存设备BLE PIN","pin.device.saved":"设备BLE PIN已更新！","pin.device.disabled":"设备BLE PIN已禁用","pin.device.error.enable":"请先启用设备BLE PIN","pin.device.error.digits":"设备BLE PIN必须恰好6位数字！","pin.device.error.match":"设备BLE PIN不匹配！","pin.duress.title":"销毁PIN","pin.duress.notice":"输入此PIN后所有数据将被永久销毁。","pin.duress.label.enable":"启用销毁PIN","pin.duress.desc":"输入时擦除设备的独立PIN","pin.duress.label.new":"新销毁PIN（与启动PIN长度相同）：","pin.duress.label.confirm":"确认销毁PIN：","pin.duress.placeholder.enter":"输入销毁PIN","pin.duress.placeholder.confirm":"确认销毁PIN","pin.duress.important":"此PIN必须与主PIN不同。输入后将立即销毁所有数据。","pin.duress.btn":"保存销毁PIN","pin.duress.saved":"销毁PIN已保存","pin.duress.disabled":"销毁PIN已禁用","pin.duress.error.enable":"请先打开开关","pin.duress.error.digits":"PIN长度必须与启动PIN相同","pin.duress.error.match":"两次PIN不匹配","settings.title":"设备设置","settings.pwd.title":"密码管理","settings.pwd.toggle.web":"Web控制台","settings.pwd.toggle.wifi":"WiFi热点","settings.pwd.web.form.title":"更改Web控制台密码","settings.pwd.web.desc":"更改访问此Web界面的密码。","settings.pwd.current.login":"当前登录:","settings.pwd.web.new.label":"新Web密码","settings.pwd.web.confirm.label":"确认新Web密码","settings.pwd.req.length":"至少8个字符","settings.pwd.req.upper":"一个大写字母","settings.pwd.req.lower":"一个小写字母","settings.pwd.req.number":"一个数字","settings.pwd.req.special":"一个特殊字符 (!@#$%)","settings.pwd.req.nousername":"密码不能包含用户名","settings.pwd.web.btn":"更改密码","settings.pwd.wifi.form.title":"更改WiFi热点密码","settings.pwd.wifi.desc":"更改AP模式下WiFi热点的密码。","settings.pwd.wifi.new.label":"新WiFi AP密码","settings.pwd.wifi.confirm.label":"确认新WiFi AP密码","settings.pwd.wifi.btn":"更改WiFi密码","settings.pwd.err.match":"密码不匹配！","settings.pwd.err.requirements":"密码不符合要求！","settings.pwd.err.wifi.short":"WiFi密码至少需要8个字符！","settings.pwd.web.saved":"密码更改成功！","settings.pwd.wifi.saved":"AP密码已更改，设备正在重启。","settings.pwd.wifi.restarted":"设备已重启，请使用新密码连接WiFi热点。","settings.pwd.match":"密码匹配！","settings.ble.title":"蓝牙设置","settings.ble.label":"BLE设备名称（最多15个字符）：","settings.ble.btn":"保存BLE名称","settings.ble.saved":"BLE设备名称已更新！","settings.mdns.title":"mDNS设置","settings.mdns.label":"mDNS主机名（例如 't-disp-totp'）：","settings.mdns.btn":"保存mDNS主机名","settings.mdns.saved":"mDNS主机名已更新！","settings.wifi.title":"📶 WiFi网络","settings.wifi.ssid.label":"网络SSID","settings.wifi.ssid.placeholder":"WiFi网络名称","settings.wifi.pwd.label":"密码","settings.wifi.pwd.placeholder":"WiFi密码（最少8个字符）","settings.wifi.confirm.label":"确认密码","settings.wifi.confirm.placeholder":"重复密码","settings.wifi.btn":"保存WiFi凭据","settings.wifi.note":"⚠ 更改将在重启后生效。","settings.wifi.err.ssid":"SSID为必填项。","settings.wifi.err.match":"密码不匹配。","settings.wifi.err.short":"密码至少需要8个字符。","settings.wifi.err.failed":"请求失败。","settings.wifi.saved":"WiFi凭据已保存！","settings.scan.scanning":"⏳ 扫描中...","settings.scan.btn":"📡 扫描","settings.scan.failed":"扫描失败","settings.startup.title":"启动模式","settings.startup.label":"启动时的默认模式：","settings.startup.opt.totp":"TOTP验证器","settings.startup.opt.pwd":"密码管理器","settings.startup.btn":"保存启动模式","settings.startup.saved":"启动模式保存成功！","settings.boot.title":"引导模式","settings.boot.label":"引导时的默认网络模式：","settings.boot.opt.wifi":"WiFi模式","settings.boot.opt.ap":"AP模式","settings.boot.opt.offline":"离线模式","settings.boot.note":"可在引导时通过按钮覆盖（2秒窗口）。","settings.boot.btn":"保存引导模式","settings.boot.saving":"保存中...","settings.boot.saved":"引导模式已保存！将在下次重启时生效。","settings.hid.title":"HID发送模式","settings.hid.label":"发送密码时的默认模式：","settings.hid.opt.ble":"BLE（自动）/ USB通过BTN2","settings.hid.opt.usb":"USB（自动）/ BLE通过BTN1","settings.hid.note":"可在3秒内通过按键切换。","settings.hid.btn":"保存HID模式","settings.hid.saving":"保存中...","settings.hid.saved":"HID模式已保存。","settings.hid.error":"保存HID模式出错。","settings.webserver.title":"Web服务器","settings.webserver.label":"不活动时自动关闭（WiFi模式）：","settings.webserver.opt.5m":"5分钟","settings.webserver.opt.10m":"10分钟","settings.webserver.opt.1h":"1小时","settings.webserver.opt.never":"从不","settings.webserver.btn":"保存设置","settings.webserver.saving":"正在保存设置并重启设备...","settings.session.title":"自动注销计时器","settings.session.label":"登录保持时长：","settings.session.opt.reboot":"直到设备重启","settings.session.opt.1h":"1小时","settings.session.opt.6h":"6小时（默认）","settings.session.opt.24h":"24小时","settings.session.opt.3d":"3天","settings.session.notice":"控制自动注销时间以增强安全性。会话在设备重启后继续有效，但「直到重启」模式除外，该模式在断电后需要重新登录。较长的持续时间可减少登录频率，但设备丢失时可能降低安全性。","settings.session.btn":"保存自动注销计时器","settings.session.info.reboot":"会话现在将在设备重启时过期。","settings.session.info.1h":"会话现在将在1小时后过期。","settings.session.info.6h":"会话现在将在6小时后过期。","settings.session.info.24h":"会话现在将在24小时后过期。","settings.session.info.3d":"会话现在将在3天后过期。","settings.session.info.fallback":"会话时长已更新。","settings.session.err":"无法更新会话时长。","settings.system.title":"系统","settings.system.reboot":"重启设备","settings.system.reboot.web":"重启并启用Web服务器","settings.system.ble.clear":"清除BLE客户端","settings.system.logout":"退出登录","settings.system.ble.cleared":"BLE客户端已成功清除！","settings.system.rebooting.web":"正在重启并启用Web服务器...","settings.system.rebooting":"正在重启...","system.shutdown.title":"会话超时","system.shutdown.btn":"继续会话","system.shutdown.shutdown.title":"服务器正在关闭","system.shutdown.shutdown.desc":"服务器因不活动已关闭。请重启设备以重新访问。","passwords.modal.password":"密码:","passwords.export.success":"导出成功！","passwords.import.success":"导入成功！","keys.api.active":"活跃 (剩余{s}秒)","keys.btn.export":"导出密钥","keys.btn.import":"导入密钥","keys.export.title":"确认导出","keys.export.desc":"请输入管理员密码以加密并导出数据。","keys.import.title":"确认导入","keys.import.desc":"请输入管理员密码以解密并导入所选文件。现有数据将被覆盖。","passwords.cat.all":"全部","passwords.cat.web":"网页","passwords.cat.app":"应用","passwords.cat.local":"本地","passwords.cat.key":"密钥 / 令牌","passwords.cat.label":"类别","passwords.cat.none":"无类别"},es:{"app.title":"Panel de control del autenticador","tab.keys":"Claves","tab.passwords":"Contraseñas","tab.display":"Pantalla","tab.pin":"PIN","tab.settings":"Ajustes","keys.title":"Gestionar claves","keys.add.title":"Añadir nueva clave","keys.add.btn":"Añadir clave","keys.current.title":"Claves actuales","keys.importexport.title":"Importar/Exportar claves","keys.advanced":"Configuración avanzada","keys.hotp.sync":"Los contadores HOTP se sincronizan junto con las claves TOTP","keys.api.status":"Estado API:","keys.api.inactive":"Inactivo","keys.add.success":"✅ ¡Clave añadida correctamente!","keys.remove.success":"¡Clave eliminada!","keys.order.saved":"¡Orden de claves guardado!","keys.api.enabled":"Acceso API habilitado por 5 minutos.","keys.hotp.generated":"✅ Código HOTP generado","keys.copied":"¡Código TOTP copiado!","keys.hotp_copied":"¡Código HOTP copiado!","ui.loading":"Cargando...","keys.col.name":"Nombre","keys.col.code":"Código","keys.col.timer":"Temporizador","keys.col.progress":"Progreso","keys.col.actions":"Acciones","keys.btn.remove":"Eliminar","keys.btn.next":"🔄 Siguiente","keys.api.enable":"Activar API (5 min)","keys.field.name":"Nombre:","keys.field.secret":"Secreto (Base32):","keys.field.algorithm":"Algoritmo:","keys.type.totp":"TOTP (basado en tiempo)","keys.type.hotp":"HOTP (basado en contador)","keys.digits.6":"6 dígitos","keys.digits.8":"8 dígitos","keys.period.30":"30 segundos","keys.period.60":"60 segundos","keys.field.digits":"Dígitos:","keys.field.period":"Período:","keys.algo.sha1":"SHA1 (Estándar)","passwords.title":"Gestionar contraseñas","passwords.add.title":"Añadir nueva contraseña","passwords.field.name":"Nombre:","passwords.field.password":"Contraseña:","passwords.add.btn":"Añadir contraseña","passwords.current.title":"Contraseñas actuales","passwords.col.name":"Nombre","passwords.col.actions":"Acciones","passwords.btn.copy":"Copiar","passwords.btn.edit":"Editar","passwords.btn.remove":"Eliminar","passwords.copied":"¡Contraseña copiada!","passwords.updated":"¡Contraseña actualizada!","passwords.removed":"¡Contraseña eliminada!","passwords.added":"¡Contraseña añadida!","passwords.order.saved":"¡Orden de contraseñas guardado!","passwords.order.failed":"Error al guardar el orden.","passwords.gen.title":"Generador de contraseñas","passwords.gen.desc":"Elige la longitud y genera una contraseña segura","passwords.gen.generated":"Contraseña generada:","passwords.gen.btn.generate":"Generar ahora","passwords.gen.btn.use":"Usar esta contraseña","passwords.edit.title":"Editar contraseña","passwords.edit.desc":"Cambiar el nombre y la contraseña de esta entrada","passwords.edit.name":"Nombre:","passwords.edit.password":"Contraseña:","passwords.edit.btn.save":"Guardar","passwords.edit.btn.cancel":"Cancelar","passwords.strength.weak":"Contraseña débil","passwords.strength.medium":"Contraseña media","passwords.strength.strong":"Contraseña fuerte","passwords.strength.encryption":"Clave de cifrado","passwords.importexport.title":"Importar/Exportar contraseñas","passwords.btn.export":"Exportar contraseñas","passwords.btn.import":"Importar contraseñas","passwords.gen.length":"Longitud de contraseña:","passwords.modal.confirm":"Confirmar","passwords.export.title":"Confirmar exportación","passwords.export.desc":"Ingrese su contraseña de administrador para cifrar y exportar las contraseñas.","passwords.import.title":"Confirmar importación","passwords.import.desc":"Ingrese su contraseña de administrador para descifrar e importar las contraseñas.","system.shutdown.desc":"El servidor web se apagará automáticamente por inactividad.","system.shutdown.remaining":"Tiempo restante:","display.title":"Configuración de pantalla","display.theme.saved":"¡Tema aplicado correctamente!","display.theme.title":"Selección de tema","display.theme.light":"Tema claro","display.theme.dark":"Tema oscuro","display.theme.btn":"Aplicar tema","display.splash.title":"Pantalla de inicio","display.splash.label":"Modo de pantalla de inicio integrada:","display.splash.disabled":"Desactivado (sin pantalla de inicio)","display.splash.btn":"Guardar modo","display.splash.saved":"¡Modo de pantalla guardado! Reinicie para aplicar.","display.splash.select":"Por favor, seleccione un modo de pantalla","display.clock.title":"Reloj","display.clock.timezone":"Zona horaria:","display.clock.save.tz":"Guardar zona horaria","display.clock.tz.saved":"¡Zona horaria guardada! Aplicada inmediatamente.","display.clock.tz.select":"Por favor, seleccione una zona horaria","display.rtc.title":"Módulo RTC DS3231","display.rtc.desc":"Reloj hardware para modo sin conexión/AP","display.rtc.sda":"Pin SDA","display.rtc.scl":"Pin SCL","display.rtc.btn":"Sincronizar y guardar","display.rtc.saving":"Guardando...","display.rtc.saved":"Configuración RTC guardada","display.rtc.status.notfound":"No encontrado","display.rtc.status.check":"Verificar pines I2C","display.rtc.status.drifted":"Deriva de tiempo","display.rtc.status.ok":"OK","display.rtc.hint.ntp":"La hora se sincronizará desde NTP automáticamente en el próximo arranque con WiFi.","display.rtc.hint.browser":"La hora se sincronizará desde el reloj del navegador cuando guarde.","display.lock.title":"Pantalla y bloqueo","display.lock.screen.label":"Tiempo de espera de pantalla (apagar pantalla después de):","display.lock.auto.label":"Bloqueo automático (sueño profundo + PIN requerido después de):","display.lock.dim.label":"Atenuación automática (reducir brillo al 20% después de):","display.lock.opt.5s":"5 segundos","display.lock.opt.10s":"10 segundos","display.lock.warning":"El orden debe cumplirse: atenuación < tiempo de espera ≤ bloqueo automático (cuando cada uno está habilitado).","display.lock.btn":"Guardar configuración","display.lock.saved":"¡Configuración de pantalla guardada correctamente!","display.lock.error.order":"¡El tiempo de bloqueo automático debe ser mayor que el tiempo de espera de pantalla!","display.lock.never":"Nunca","display.lock.opt.15s":"15 segundos","display.lock.opt.30s":"30 segundos","display.lock.opt.1m":"1 minuto","display.lock.opt.5m":"5 minutos","display.lock.opt.15m":"15 minutos","display.lock.opt.30m":"30 minutos","display.lock.opt.1h":"1 hora","display.lock.opt.4h":"4 horas","pin.title":"Configuración de PIN","pin.startup.label":"PIN de inicio","pin.startup.desc":"Cifrar clave del dispositivo con PIN al arrancar","pin.startup.btn":"Guardar configuración de PIN de inicio","pin.cancelled":"Cambio de PIN cancelado.","pin.reset.cancelled":"Restablecimiento cancelado.","pin.rebooting":"El dispositivo se está reiniciando... Por favor espere.","pin.ble.title":"PIN de emparejamiento BLE","pin.ble.notice":"Este PIN se muestra en la pantalla del dispositivo durante el emparejamiento BLE para autenticación del cliente.","pin.ble.label.new":"Nuevo PIN de emparejamiento BLE (6 dígitos):","pin.ble.label.confirm":"Confirmar PIN de emparejamiento BLE:","pin.ble.important":"Este PIN se mostrará en la pantalla ESP32 durante el emparejamiento BLE para que el cliente lo ingrese.","pin.ble.btn":"Actualizar PIN de emparejamiento BLE","pin.ble.saved":"¡PIN de emparejamiento BLE actualizado! Todos los clientes BLE desconectados.","pin.ble.error.digits":"¡El PIN de emparejamiento BLE debe tener exactamente 6 dígitos!","pin.ble.error.match":"¡Los PINs de emparejamiento BLE no coinciden!","pin.placeholder.enter":"Ingresar PIN de 6 dígitos","pin.placeholder.confirm":"Confirmar PIN de 6 dígitos","pin.device.title":"PIN de dispositivo BLE","pin.device.notice":"Este PIN es requerido en el dispositivo al transmitir contraseñas vía BLE.","pin.device.label.enable":"Habilitar PIN de dispositivo BLE","pin.device.desc":"Requerir PIN en el dispositivo para transmisión de contraseñas BLE","pin.device.label.new":"Nuevo PIN de dispositivo BLE (6 dígitos):","pin.device.label.confirm":"Confirmar PIN de dispositivo BLE:","pin.device.important":"Este PIN será requerido en la pantalla del dispositivo al transmitir contraseñas vía BLE.","pin.device.btn":"Guardar PIN de dispositivo BLE","pin.device.saved":"¡PIN de dispositivo BLE actualizado!","pin.device.disabled":"PIN de dispositivo BLE deshabilitado","pin.device.error.enable":"Por favor habilite el PIN de dispositivo BLE primero","pin.device.error.digits":"¡El PIN de dispositivo BLE debe tener exactamente 6 dígitos!","pin.device.error.match":"¡Los PINs de dispositivo BLE no coinciden!","pin.duress.title":"PIN de destrucción","pin.duress.notice":"Al ingresar este PIN, todos los datos serán destruidos permanentemente.","pin.duress.label.enable":"Activar PIN de destrucción","pin.duress.desc":"PIN separado que borra el dispositivo al ingresarlo","pin.duress.label.new":"Nuevo PIN de destrucción (misma longitud que el PIN de inicio):","pin.duress.label.confirm":"Confirmar PIN de destrucción:","pin.duress.placeholder.enter":"Ingresar PIN de destrucción","pin.duress.placeholder.confirm":"Confirmar PIN de destrucción","pin.duress.important":"Este PIN debe diferir del principal. La entrada borrará todos los datos inmediatamente.","pin.duress.btn":"Guardar PIN de destrucción","pin.duress.saved":"PIN de destrucción guardado","pin.duress.disabled":"PIN de destrucción desactivado","pin.duress.error.enable":"Active el interruptor primero","pin.duress.error.digits":"La longitud del PIN debe coincidir con el PIN de inicio","pin.duress.error.match":"Los PINs no coinciden","settings.title":"Configuración del dispositivo","settings.pwd.title":"Gestión de contraseñas","settings.pwd.toggle.web":"Gabinete Web","settings.pwd.toggle.wifi":"Punto de acceso WiFi","settings.pwd.web.form.title":"Cambiar contraseña del gabinete web","settings.pwd.web.desc":"Cambiar la contraseña para acceder a esta interfaz web.","settings.pwd.current.login":"Inicio de sesión actual:","settings.pwd.web.new.label":"Nueva contraseña web","settings.pwd.web.confirm.label":"Confirmar nueva contraseña web","settings.pwd.req.length":"Al menos 8 caracteres","settings.pwd.req.upper":"Una letra mayúscula","settings.pwd.req.lower":"Una letra minúscula","settings.pwd.req.number":"Un número","settings.pwd.req.special":"Un carácter especial (!@#$%)","settings.pwd.req.nousername":"La contraseña no debe contener tu nombre de usuario","settings.pwd.web.btn":"Cambiar contraseña","settings.pwd.wifi.form.title":"Cambiar contraseña del punto de acceso WiFi","settings.pwd.wifi.desc":"Cambiar la contraseña del punto de acceso WiFi en modo AP.","settings.pwd.wifi.new.label":"Nueva contraseña WiFi AP","settings.pwd.wifi.confirm.label":"Confirmar nueva contraseña WiFi AP","settings.pwd.wifi.btn":"Cambiar contraseña WiFi","settings.pwd.err.match":"¡Las contraseñas no coinciden!","settings.pwd.err.requirements":"¡La contraseña no cumple los requisitos!","settings.pwd.err.wifi.short":"¡La contraseña WiFi debe tener al menos 8 caracteres!","settings.pwd.web.saved":"¡Contraseña cambiada exitosamente!","settings.pwd.wifi.saved":"Contraseña AP cambiada. El dispositivo se reinicia.","settings.pwd.wifi.restarted":"Dispositivo reiniciado. Conéctese al AP WiFi con la nueva contraseña.","settings.pwd.match":"¡Las contraseñas coinciden!","settings.ble.title":"Configuración Bluetooth","settings.ble.label":"Nombre de dispositivo BLE (máx. 15 caracteres):","settings.ble.btn":"Guardar nombre BLE","settings.ble.saved":"¡Nombre de dispositivo BLE actualizado!","settings.mdns.title":"Configuración mDNS","settings.mdns.label":"Nombre de host mDNS (ej., 't-disp-totp'):","settings.mdns.btn":"Guardar nombre de host mDNS","settings.mdns.saved":"¡Nombre de host mDNS actualizado!","settings.wifi.title":"📶 Red WiFi","settings.wifi.ssid.label":"SSID de red","settings.wifi.ssid.placeholder":"Nombre de red WiFi","settings.wifi.pwd.label":"Contraseña","settings.wifi.pwd.placeholder":"Contraseña WiFi (mín. 8 caracteres)","settings.wifi.confirm.label":"Confirmar contraseña","settings.wifi.confirm.placeholder":"Repetir contraseña","settings.wifi.btn":"Guardar credenciales WiFi","settings.wifi.note":"⚠ Los cambios se aplican después del reinicio.","settings.wifi.err.ssid":"El SSID es obligatorio.","settings.wifi.err.match":"Las contraseñas no coinciden.","settings.wifi.err.short":"La contraseña debe tener al menos 8 caracteres.","settings.wifi.err.failed":"Solicitud fallida.","settings.wifi.saved":"¡Credenciales WiFi guardadas!","settings.scan.scanning":"⏳ Escaneando...","settings.scan.btn":"📡 Escanear","settings.scan.failed":"Escaneo fallido","settings.startup.title":"Modo de inicio","settings.startup.label":"Modo predeterminado al iniciar:","settings.startup.opt.totp":"Autenticador TOTP","settings.startup.opt.pwd":"Gestor de contraseñas","settings.startup.btn":"Guardar modo de inicio","settings.startup.saved":"¡Modo de inicio guardado correctamente!","settings.boot.title":"Modo de arranque","settings.boot.label":"Modo de red predeterminado al arrancar:","settings.boot.opt.wifi":"Modo WiFi","settings.boot.opt.ap":"Modo AP","settings.boot.opt.offline":"Modo sin conexión","settings.boot.note":"Anulación disponible con botones durante el arranque (ventana de 2 seg).","settings.boot.btn":"Guardar modo de arranque","settings.boot.saving":"Guardando...","settings.boot.saved":"¡Modo de arranque guardado! Se aplicará en el próximo reinicio.","settings.hid.title":"Modo de envío HID","settings.hid.label":"Modo predeterminado al enviar contraseña:","settings.hid.opt.ble":"BLE (auto) / USB con BTN2","settings.hid.opt.usb":"USB (auto) / BLE con BTN1","settings.hid.note":"Anulación disponible con botones durante 3s.","settings.hid.btn":"Guardar modo HID","settings.hid.saving":"Guardando...","settings.hid.saved":"Modo HID guardado.","settings.hid.error":"Error al guardar el modo HID.","settings.webserver.title":"Servidor web","settings.webserver.label":"Apagado automático por inactividad (Modo WiFi):","settings.webserver.opt.5m":"5 minutos","settings.webserver.opt.10m":"10 minutos","settings.webserver.opt.1h":"1 hora","settings.webserver.opt.never":"Nunca","settings.webserver.btn":"Guardar ajuste","settings.webserver.saving":"Guardando configuración y reiniciando dispositivo...","settings.session.title":"Temporizador de cierre de sesión","settings.session.label":"Tiempo de sesión activa:","settings.session.opt.reboot":"Hasta el reinicio del dispositivo","settings.session.opt.1h":"1 hora","settings.session.opt.6h":"6 horas (predeterminado)","settings.session.opt.24h":"24 horas","settings.session.opt.3d":"3 días","settings.session.notice":"Controla el tiempo de cierre de sesión automático para mayor seguridad. Las sesiones sobreviven a los reinicios excepto el modo «Hasta reinicio», que requiere inicio de sesión tras apagado. Las duraciones largas reducen la frecuencia de inicio de sesión pero pueden comprometer la seguridad si el dispositivo se pierde.","settings.session.btn":"Guardar temporizador de cierre","settings.session.info.reboot":"Las sesiones ahora expirarán al reiniciar el dispositivo.","settings.session.info.1h":"Las sesiones ahora expirarán después de 1 hora.","settings.session.info.6h":"Las sesiones ahora expirarán después de 6 horas.","settings.session.info.24h":"Las sesiones ahora expirarán después de 24 horas.","settings.session.info.3d":"Las sesiones ahora expirarán después de 3 días.","settings.session.info.fallback":"Duración de sesión actualizada.","settings.session.err":"No se pudo actualizar la duración de la sesión.","settings.system.title":"Sistema","settings.system.reboot":"Reiniciar dispositivo","settings.system.reboot.web":"Reiniciar con servidor web","settings.system.ble.clear":"Borrar clientes BLE","settings.system.logout":"Cerrar sesión","settings.system.ble.cleared":"¡Clientes BLE borrados correctamente!","settings.system.rebooting.web":"Reiniciando con servidor web habilitado...","settings.system.rebooting":"Reiniciando...","system.shutdown.title":"Tiempo de sesión agotado","system.shutdown.btn":"Continuar sesión","system.shutdown.shutdown.title":"Servidor apagándose","system.shutdown.shutdown.desc":"El servidor se apagó por inactividad. Por favor, reinicie el dispositivo para acceder.","passwords.modal.password":"Contraseña:","passwords.export.success":"¡Exportación exitosa!","passwords.import.success":"¡Importación exitosa!","keys.api.active":"Activo ({s}s restantes)","keys.btn.export":"Exportar claves","keys.btn.import":"Importar claves","keys.export.title":"Confirmar exportación","keys.export.desc":"Ingrese su contraseña de administrador para cifrar y exportar los datos.","keys.import.title":"Confirmar importación","keys.import.desc":"Ingrese su contraseña de administrador para descifrar e importar el archivo seleccionado. Los datos existentes serán sobrescritos.","passwords.cat.all":"Todos","passwords.cat.web":"Web","passwords.cat.app":"App","passwords.cat.local":"Local","passwords.cat.key":"Clave / Token","passwords.cat.label":"Categoría","passwords.cat.none":"Sin categoría"},en:{"app.title":"Authenticator Control Panel","tab.keys":"Keys","tab.passwords":"Passwords","tab.display":"Display","tab.pin":"PIN","tab.settings":"Settings","keys.title":"Manage Keys","keys.add.title":"Add New Key","keys.add.btn":"Add Key","keys.current.title":"Current Keys","keys.importexport.title":"Import/Export Keys","keys.advanced":"Advanced Settings","keys.hotp.sync":"HOTP counters are synced together with TOTP keys","keys.api.status":"API Status:","keys.api.inactive":"Inactive","keys.add.success":"✅ Key added successfully!","keys.remove.success":"Key removed successfully!","keys.order.saved":"Keys order saved!","keys.api.enabled":"API access enabled for 5 minutes.","keys.hotp.generated":"✅ HOTP code generated","keys.copied":"TOTP code copied!","keys.hotp_copied":"HOTP code copied!","ui.loading":"Loading...","keys.col.name":"Name","keys.col.code":"Code","keys.col.timer":"Timer","keys.col.progress":"Progress","keys.col.actions":"Actions","keys.btn.remove":"Remove","keys.btn.next":"🔄 Next","keys.api.enable":"Enable API Access (5 min)","keys.field.name":"Name:","keys.field.secret":"Secret (Base32):","keys.field.algorithm":"Algorithm:","keys.type.totp":"TOTP (Time-based)","keys.type.hotp":"HOTP (Counter-based)","keys.digits.6":"6 digits","keys.digits.8":"8 digits","keys.period.30":"30 seconds","keys.period.60":"60 seconds","keys.field.digits":"Digits:","keys.field.period":"Period:","keys.algo.sha1":"SHA1 (Standard)","keys.api.active":"Active ({s}s remaining)","passwords.title":"Manage Passwords","passwords.add.title":"Add New Password","passwords.field.name":"Name:","passwords.field.password":"Password:","passwords.add.btn":"Add Password","passwords.current.title":"Current Passwords","passwords.col.name":"Name","passwords.col.actions":"Actions","passwords.btn.copy":"Copy","passwords.btn.edit":"Edit","passwords.btn.remove":"Remove","passwords.copied":"Password copied to clipboard!","passwords.updated":"Password updated successfully!","passwords.removed":"Password removed successfully!","passwords.added":"Password added successfully!","passwords.order.saved":"Passwords order saved!","passwords.order.failed":"Failed to save passwords order.","passwords.gen.title":"Password Generator","passwords.gen.desc":"Choose password length and generate a secure password","passwords.gen.generated":"Generated Password:","passwords.gen.btn.generate":"Generate New","passwords.gen.btn.use":"Use This Password","passwords.edit.title":"Edit Password","passwords.edit.desc":"Change the name and password for this entry","passwords.edit.name":"Name:","passwords.edit.password":"Password:","passwords.edit.btn.save":"Save","passwords.edit.btn.cancel":"Cancel","passwords.strength.weak":"Weak Password","passwords.strength.medium":"Medium Password","passwords.strength.strong":"Strong Password","passwords.strength.encryption":"Encryption Key","passwords.importexport.title":"Import/Export Passwords","passwords.btn.export":"Export Passwords","passwords.btn.import":"Import Passwords","passwords.gen.length":"Password Length:","passwords.modal.confirm":"Confirm","passwords.export.title":"Confirm Export","passwords.export.desc":"Please enter your web admin password to encrypt and export your passwords.","passwords.import.title":"Confirm Import","passwords.import.desc":"Enter your web admin password to decrypt and import your passwords.","system.shutdown.desc":"The web server will automatically shut down due to inactivity.","system.shutdown.remaining":"Time remaining:","display.title":"Display Settings","display.theme.saved":"Theme updated successfully!","display.theme.title":"Theme Selection","display.theme.light":"Light Theme","display.theme.dark":"Dark Theme","display.theme.btn":"Apply Theme","display.splash.title":"Splash Screen","display.splash.label":"Embedded Splash Mode:","display.splash.disabled":"Disabled (No splash screen)","display.splash.btn":"Save Mode","display.splash.saved":"Splash mode saved! Reboot to apply.","display.splash.select":"Please select a splash mode","display.clock.title":"Clock Display","display.clock.timezone":"Timezone:","display.clock.save.tz":"Save Timezone","display.clock.tz.saved":"Timezone saved! Applied immediately.","display.clock.tz.select":"Please select a timezone","display.rtc.title":"DS3231 RTC Module","display.rtc.desc":"Hardware clock for offline/AP time","display.rtc.sda":"SDA Pin","display.rtc.scl":"SCL Pin","display.rtc.btn":"Sync & Save","display.rtc.saving":"Saving...","display.rtc.saved":"RTC settings saved","display.rtc.status.notfound":"Not Found","display.rtc.status.check":"Check I2C pins","display.rtc.status.drifted":"Drifted","display.rtc.status.ok":"OK","display.rtc.hint.ntp":"Time will be synced from NTP automatically on next WiFi boot.","display.rtc.hint.browser":"Time will be synced from your browser clock when you save.","display.lock.title":"Screen & Lock Settings","display.lock.screen.label":"Screen timeout (turn off display after):","display.lock.auto.label":"Auto lock (deep sleep + PIN required after):","display.lock.dim.label":"Auto-dim (reduce brightness to 20% after):","display.lock.opt.5s":"5 seconds","display.lock.opt.10s":"10 seconds","display.lock.warning":"Settings must follow: auto-dim < screen timeout ≤ auto lock (when each is enabled).","display.lock.btn":"Save Settings","display.lock.saved":"Display settings saved successfully!","display.lock.error.order":"Auto lock timeout must be greater than screen timeout!","display.lock.never":"Never","display.lock.opt.15s":"15 seconds","display.lock.opt.30s":"30 seconds","display.lock.opt.1m":"1 minute","display.lock.opt.5m":"5 minutes","display.lock.opt.15m":"15 minutes","display.lock.opt.30m":"30 minutes","display.lock.opt.1h":"1 hour","display.lock.opt.4h":"4 hours","pin.title":"PIN Code Settings","pin.startup.label":"Startup PIN","pin.startup.desc":"Encrypt device key with PIN on startup","pin.startup.btn":"Save Startup PIN Settings","pin.cancelled":"PIN settings change cancelled.","pin.reset.cancelled":"Factory reset cancelled.","pin.rebooting":"Device is rebooting... Please wait.","pin.ble.title":"BLE Bonding PIN","pin.ble.notice":"This PIN is displayed on device screen during BLE pairing for client authentication.","pin.ble.label.new":"New BLE Bonding PIN (6 digits):","pin.ble.label.confirm":"Confirm BLE Bonding PIN:","pin.ble.important":"This PIN will be displayed on the ESP32 screen during BLE pairing for clients to enter.","pin.ble.btn":"Update BLE Bonding PIN","pin.ble.saved":"BLE Bonding PIN updated successfully! All BLE clients cleared.","pin.ble.error.digits":"BLE Bonding PIN must be exactly 6 digits!","pin.ble.error.match":"BLE Bonding PINs do not match!","pin.placeholder.enter":"Enter 6-digit PIN","pin.placeholder.confirm":"Confirm 6-digit PIN","pin.device.title":"Device BLE PIN","pin.device.notice":"This PIN is required on the hardware device when transmitting passwords via BLE.","pin.device.label.enable":"Enable Device BLE PIN","pin.device.desc":"Require PIN on device for BLE password transmission","pin.device.label.new":"New Device BLE PIN (6 digits):","pin.device.label.confirm":"Confirm Device BLE PIN:","pin.device.important":"This PIN will be required on the device screen when transmitting passwords via BLE.","pin.device.btn":"Save Device BLE PIN","pin.device.saved":"Device BLE PIN updated successfully!","pin.device.disabled":"Device BLE PIN disabled","pin.device.error.enable":"Please enable Device BLE PIN first","pin.device.error.digits":"Device BLE PIN must be exactly 6 digits!","pin.device.error.match":"Device BLE PINs do not match!","pin.duress.title":"Duress PIN","pin.duress.notice":"Entering this PIN will permanently destroy all data on the device.","pin.duress.label.enable":"Enable Duress PIN","pin.duress.desc":"A separate PIN that wipes the device when entered","pin.duress.label.new":"New Duress PIN (same length as startup PIN):","pin.duress.label.confirm":"Confirm Duress PIN:","pin.duress.placeholder.enter":"Enter duress PIN","pin.duress.placeholder.confirm":"Confirm duress PIN","pin.duress.important":"This PIN must differ from your main PIN. Entry immediately destroys all data.","pin.duress.btn":"Save Duress PIN","pin.duress.saved":"Duress PIN saved","pin.duress.disabled":"Duress PIN disabled","pin.duress.error.enable":"Enable the toggle first","pin.duress.error.digits":"PIN length must match your startup PIN","pin.duress.error.match":"PINs do not match","settings.title":"Device Settings","settings.pwd.title":"Password Management","settings.pwd.toggle.web":"Web Cabinet","settings.pwd.toggle.wifi":"WiFi Access Point","settings.pwd.web.form.title":"Change Web Cabinet Password","settings.pwd.web.desc":"Change the password for accessing this web interface.","settings.pwd.current.login":"Current Login:","settings.pwd.web.new.label":"New Web Password","settings.pwd.web.confirm.label":"Confirm New Web Password","settings.pwd.req.length":"At least 8 characters","settings.pwd.req.upper":"An uppercase letter","settings.pwd.req.lower":"A lowercase letter","settings.pwd.req.number":"A number","settings.pwd.req.special":"A special character (!@#$%)","settings.pwd.req.nousername":"Password must not contain your username","settings.pwd.web.btn":"Change Password","settings.pwd.wifi.form.title":"Change WiFi Access Point Password","settings.pwd.wifi.desc":"Change the password for the WiFi Access Point used in AP mode.","settings.pwd.wifi.new.label":"New WiFi AP Password","settings.pwd.wifi.confirm.label":"Confirm New WiFi AP Password","settings.pwd.wifi.btn":"Change WiFi Password","settings.pwd.err.match":"Passwords do not match!","settings.pwd.err.requirements":"Password does not meet requirements!","settings.pwd.err.wifi.short":"WiFi password must be at least 8 characters!","settings.pwd.web.saved":"Password changed successfully!","settings.pwd.wifi.saved":"AP password changed. Device is restarting.","settings.pwd.wifi.restarted":"Device restarted. Reconnect to WiFi AP with new password.","settings.pwd.match":"Passwords match!","settings.ble.title":"Bluetooth Settings","settings.ble.label":"BLE Device Name (max 15 chars):","settings.ble.btn":"Save BLE Name","settings.ble.saved":"BLE device name updated!","settings.mdns.title":"mDNS Settings","settings.mdns.label":"mDNS Hostname (e.g., 't-disp-totp'):","settings.mdns.btn":"Save mDNS Hostname","settings.mdns.saved":"mDNS hostname updated!","settings.wifi.title":"📶 WiFi Network","settings.wifi.ssid.label":"Network SSID","settings.wifi.ssid.placeholder":"WiFi network name","settings.wifi.pwd.label":"Password","settings.wifi.pwd.placeholder":"WiFi password (min 8 chars)","settings.wifi.confirm.label":"Confirm Password","settings.wifi.confirm.placeholder":"Repeat password","settings.wifi.btn":"Save WiFi Credentials","settings.wifi.note":"⚠ Changes apply after reboot.","settings.wifi.err.ssid":"SSID is required.","settings.wifi.err.match":"Passwords do not match.","settings.wifi.err.short":"Password must be at least 8 characters.","settings.wifi.err.failed":"Request failed.","settings.wifi.saved":"WiFi credentials saved!","settings.scan.scanning":"⏳ Scanning...","settings.scan.btn":"📡 Scan","settings.scan.failed":"Scan failed","settings.startup.title":"Startup Mode","settings.startup.label":"Default mode on startup:","settings.startup.opt.totp":"TOTP Authenticator","settings.startup.opt.pwd":"Password Manager","settings.startup.btn":"Save Startup Mode","settings.startup.saved":"Startup mode saved successfully!","settings.boot.title":"Boot Mode","settings.boot.label":"Default network mode on boot:","settings.boot.opt.wifi":"WiFi Mode","settings.boot.opt.ap":"AP Mode","settings.boot.opt.offline":"Offline Mode","settings.boot.note":"Override available via buttons during boot (2 sec window).","settings.boot.btn":"Save Boot Mode","settings.boot.saving":"Saving...","settings.boot.saved":"Boot mode saved! Will apply on next reboot.","settings.hid.title":"HID Send Mode","settings.hid.label":"Default mode when sending password:","settings.hid.opt.ble":"BLE (auto) / USB on BTN2","settings.hid.opt.usb":"USB (auto) / BLE on BTN1","settings.hid.note":"Override available via buttons during 3s prompt.","settings.hid.btn":"Save HID Mode","settings.hid.saving":"Saving...","settings.hid.saved":"HID mode saved.","settings.hid.error":"Error saving HID mode.","settings.webserver.title":"Web Server","settings.webserver.label":"Auto-shutdown on inactivity (WiFi Mode):","settings.webserver.opt.5m":"5 minutes","settings.webserver.opt.10m":"10 minutes","settings.webserver.opt.1h":"1 hour","settings.webserver.opt.never":"Never","settings.webserver.btn":"Save Setting","settings.webserver.saving":"Saving settings and restarting device...","settings.session.title":"Auto-Logout Timer","settings.session.label":"How long to stay logged in:","settings.session.opt.reboot":"Until device reboot","settings.session.opt.1h":"1 hour","settings.session.opt.6h":"6 hours (default)","settings.session.opt.24h":"24 hours","settings.session.opt.3d":"3 days","settings.session.notice":"Controls automatic logout timing for enhanced device security. Sessions survive device restarts except Until reboot mode which requires fresh login after power cycle. Longer durations reduce login frequency but may compromise security if device is lost or stolen.","settings.session.btn":"Save Auto-Logout Timer","settings.session.info.reboot":"Sessions will now expire on device reboot.","settings.session.info.1h":"Sessions will now expire after 1 hour.","settings.session.info.6h":"Sessions will now expire after 6 hours.","settings.session.info.24h":"Sessions will now expire after 24 hours.","settings.session.info.3d":"Sessions will now expire after 3 days.","settings.session.info.fallback":"Session duration updated.","settings.session.err":"Failed to update session duration.","settings.system.title":"System","settings.system.reboot":"Reboot Device","settings.system.reboot.web":"Reboot with Web Server","settings.system.ble.clear":"Clear BLE Clients","settings.system.logout":"Logout","settings.system.ble.cleared":"BLE clients cleared successfully!","settings.system.rebooting.web":"Rebooting with web server enabled...","settings.system.rebooting":"Rebooting...","system.shutdown.title":"Session Timeout","system.shutdown.btn":"Continue Session","system.shutdown.shutdown.title":"Server Shutting Down","system.shutdown.shutdown.desc":"The server has been shut down due to inactivity. Please reboot the device to access it again.","passwords.modal.password":"Password:","passwords.export.success":"Export successful!","passwords.import.success":"Import successful!","keys.btn.export":"Export Keys","keys.btn.import":"Import Keys","keys.export.title":"Confirm Export","keys.export.desc":"Please enter your web admin password to encrypt and export your data.","keys.import.title":"Confirm Import","keys.import.desc":"Enter your web admin password to decrypt and import the selected file. This will overwrite existing data.","passwords.cat.all":"All","passwords.cat.web":"Web","passwords.cat.app":"App","passwords.cat.local":"Local","passwords.cat.key":"Key / Token","passwords.cat.label":"Category","passwords.cat.none":"No category"}};let currentLang=localStorage.getItem('lang')||'en';function tr(key){return i18n[currentLang]?.[key]??i18n['en']?.[key]??key;}async function loadLang(lang){if(i18n[lang]){applyLang(lang);return;}console.warn('Lang not available:',lang);}function applyLang(lang){currentLang=lang;localStorage.setItem('lang',lang);document.querySelectorAll('[data-i18n]').forEach(el=>{const val=tr(el.dataset.i18n);if(el.tagName==='INPUT'&&el.placeholder!==undefined&&el.getAttribute('data-i18n-attr')==='placeholder'){el.placeholder=val;}else{el.textContent=val;}});document.querySelectorAll('.lang-option').forEach(o=>{o.classList.toggle('active',o.dataset.lang===lang);});const flagEl=document.getElementById('lang-flag');const flags={en:'🇬🇧',ru:'🇷🇺',de:'🇩🇪',zh:'🇨🇳',es:'🇪🇸'};if(flagEl)flagEl.textContent=flags[lang]||'🇬🇧';if(typeof appInitialized!=='undefined'&&appInitialized){if(typeof fetchKeys==='function'){CacheManager.invalidate('keys_list');fetchKeys();}if(typeof fetchPasswords==='function'){CacheManager.invalidate('passwords_list');fetchPasswords();}}}(function initLangSwitcher(){const flag=document.getElementById('lang-flag');const dropdown=document.getElementById('lang-dropdown');if(!flag||!dropdown)return;flag.addEventListener('click',function(e){e.stopPropagation();dropdown.style.display=dropdown.style.display==='none'?'block':'none';});dropdown.querySelectorAll('.lang-option').forEach(function(opt){opt.addEventListener('click',function(e){e.stopPropagation();const lang=opt.dataset.lang;dropdown.style.display='none';loadLang(lang);});});document.addEventListener('click',function(){dropdown.style.display='none';});})();async function updateBatteryWidget() {
     try {
         const resp = await makeEncryptedRequest('/api/battery', { silentFail: true });
         if (!resp || !resp.ok) return;
@@ -4988,6 +5615,11 @@ document.addEventListener('DOMContentLoaded', async function(){
             // 🛡️ Загружаем все ПОСЛЕДОВАТЕЛЬНО чтобы не перегружать сервер
             document.getElementById('add-key-form').reset();
             document.getElementById('add-password-form').reset();
+            
+            // Initialize category buttons
+            updateAddCatBtn();
+            updateEditCatBtn();
+            
             await (async () => {
             try { await fetchKeys(); } catch(e) {}
             try { await fetchPinSettings(); } catch(e) {}

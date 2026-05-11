@@ -1,7 +1,12 @@
 #include "display_manager.h"
+#include "button_helpers.h"
 #include "config.h"
 #include "log_manager.h"
+#include "config_manager.h"
 #include <qrcode_espi.h>
+
+// External reference to global ConfigManager
+extern ConfigManager configManager;
 
 // Helper for the animation loop
 void schedule_next_update(DisplayManager* dm, AnimationManager* am);
@@ -135,7 +140,11 @@ void DisplayManager::initForSplash() {
     delay(10);
 #endif
     tft.init();
-    tft.setRotation(1);
+    
+    // Apply display rotation from config (default: 1 = landscape, USB on right)
+    uint8_t rotation = configManager.getDisplayRotation();
+    tft.setRotation(rotation);
+    
     tft.fillScreen(TFT_BLACK); // Очищаем экран чёрным для splash
     tft.setTextDatum(MC_DATUM);
     
@@ -158,7 +167,11 @@ void DisplayManager::init() {
     delay(10);
 #endif
     tft.init();
-    tft.setRotation(1);
+    
+    // Apply display rotation from config (default: 1 = landscape, USB on right)
+    uint8_t rotation = configManager.getDisplayRotation();
+    tft.setRotation(rotation);
+    
     tft.fillScreen(_currentThemeColors->background_dark); 
     tft.setTextDatum(MC_DATUM);
     
@@ -816,7 +829,7 @@ bool DisplayManager::promptWebServerSelection() {
 
     while (millis() - startTime < timeout) {
         // Button 1 (top, GPIO 35) to toggle
-        if (digitalRead(BUTTON_1) == LOW) {
+        if (readBtn1()) {
             selection = !selection;
             drawButtons(selection);
             delay(300); // Debounce
@@ -824,7 +837,7 @@ bool DisplayManager::promptWebServerSelection() {
         }
 
         // Button 2 (bottom, GPIO 0) to confirm
-        if (digitalRead(BUTTON_2) == LOW) {
+        if (readBtn2()) {
             delay(300); // Debounce
             
             // 🧹 Очистка экрана перед возвратом
@@ -938,7 +951,7 @@ StartupMode DisplayManager::promptModeSelection(StartupMode defaultMode) {
 
     while (millis() - startTime < timeout) {
         // Button 1 (GPIO 35) - переключение между двумя не-дефолтными режимами
-        if (digitalRead(BUTTON_1) == LOW) {
+        if (readBtn1()) {
             selection = !selection;
             drawButtons(selection);
             delay(300); // Debounce
@@ -946,7 +959,7 @@ StartupMode DisplayManager::promptModeSelection(StartupMode defaultMode) {
         }
 
         // Button 2 (GPIO 0) - подтверждение выбора
-        if (digitalRead(BUTTON_2) == LOW) {
+        if (readBtn2()) {
             delay(300); // Debounce
             
             // 🧹 Очистка экрана перед переходом к выбранному режиму
@@ -1161,7 +1174,7 @@ void DisplayManager::setUsbHidMode(bool active) {
 bool DisplayManager::drawHidPrompt(bool defaultIsBle) {
     // Ждём пока кнопки отпустят после удержания
     unsigned long releaseWait = millis();
-    while ((digitalRead(BUTTON_1) == LOW || digitalRead(BUTTON_2) == LOW)
+    while ((readBtn1() || readBtn2())
            && millis() - releaseWait < 1000) {
         delay(10);
     }
@@ -1190,14 +1203,14 @@ bool DisplayManager::drawHidPrompt(bool defaultIsBle) {
     
     while (millis() - startTime < timeout) {
         // BTN2 — переключить на BLE (если дефолт USB)
-        if (!defaultIsBle && digitalRead(BUTTON_2) == LOW) {
+        if (!defaultIsBle && readBtn2()) {
             delay(50);
-            if (digitalRead(BUTTON_2) == LOW) { delay(200); return true; }
+            if (readBtn2()) { delay(200); return true; }
         }
         // BTN2 — переключить на USB (если дефолт BLE)
-        if (defaultIsBle && digitalRead(BUTTON_2) == LOW) {
+        if (defaultIsBle && readBtn2()) {
             delay(50);
-            if (digitalRead(BUTTON_2) == LOW) { delay(200); return false; }
+            if (readBtn2()) { delay(200); return false; }
         }
         delay(10);
     }
@@ -1608,6 +1621,7 @@ void DisplayManager::hideQRCode() {
         // Clear screen and return to normal mode
         tft.fillScreen(_currentThemeColors->background_dark);
         _totpContainerNeedsRedraw = true;
+        _isNoItemsPageActive = false; // Force redraw of empty state page after QR dismissed
     }
 }
 
@@ -1617,4 +1631,54 @@ void DisplayManager::requestShowQRCode(const String& text, int timeoutSeconds) {
     _qrCodeTimeoutSeconds = timeoutSeconds;
     _qrCodeRequested = true;
     LOG_INFO("DisplayManager", "QR code show requested (will be displayed in main loop)");
+}
+
+// Apply rotation setting and redraw current screen
+void DisplayManager::applyRotation() {
+    LOG_INFO("DisplayManager", "Applying display rotation");
+    
+    // Get rotation from config (0-3: 0=portrait, 1=landscape, 2=portrait inverted, 3=landscape inverted)
+    uint8_t rotation = configManager.getDisplayRotation();
+    tft.setRotation(rotation);
+    
+    LOG_INFO("DisplayManager", "Display rotation set to: " + String(rotation));
+    
+    // Clear screen and force full redraw
+    tft.fillScreen(_currentThemeColors->background_dark);
+    
+    // Reset all cached state to force redraw
+    lastDisplayedCode = "";
+    lastTimeRemaining = -1;
+    _lastDrawnTotpString = "";
+    _totpState = TotpState::IDLE;
+    _totpContainerNeedsRedraw = true;
+    _isNoItemsPageActive = false;   // Force redraw of empty state page after rotation
+    _needsFullRedraw = true;        // Signal main loop to reset previousIndex
+    
+    // Recreate sprites with new dimensions
+    headerSprite.deleteSprite();
+    batterySprite.deleteSprite();
+    totpContainerSprite.deleteSprite();
+    totpSprite.deleteSprite();
+    
+    // Recreate sprites with correct dimensions for new rotation
+    headerSprite.createSprite(tft.width(), 35);
+    headerSprite.setTextDatum(MC_DATUM);
+    
+    batterySprite.createSprite(30, 20);
+    batterySprite.setColorDepth(16);
+    
+    // Recreate TOTP sprites
+    int padding = 10;
+    tft.setTextSize(4);
+    int codeAreaWidth = tft.textWidth("888888") + padding * 2;
+    int codeAreaHeight = 40 + 10;
+    
+    totpContainerSprite.createSprite(codeAreaWidth + 2, codeAreaHeight + 2);
+    totpContainerSprite.setTextDatum(MC_DATUM);
+    
+    totpSprite.createSprite(codeAreaWidth - 2, codeAreaHeight - 2);
+    totpSprite.setTextDatum(MC_DATUM);
+    
+    LOG_INFO("DisplayManager", "Display rotation applied successfully");
 }

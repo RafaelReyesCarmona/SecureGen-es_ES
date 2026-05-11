@@ -46,6 +46,8 @@ Device creates its own WiFi access point (`ESP32-TOTP-Setup`, IP: 192.168.4.1). 
 **Available:** Passwords, HOTP codes, BLE password transfer, web cabinet  
 **TOTP:** Requires DS3231 RTC module. If enabled — sync time via web cabinet (Display Settings → DS3231 RTC → Sync & Save). Browser clock is used as time source. After sync, TOTP codes appear immediately without reboot.
 
+**Session behavior:** Web cabinet sessions work normally in AP mode. Without DS3231 RTC, session persistence is limited to the current boot — timed Auto-Logout modes (1 h, 6 h, 24 h, 3 days) automatically fall back to "until reboot" behavior. With RTC enabled and time synced, sessions persist across reboots according to the configured Auto-Logout Timer.
+
 ### WiFi Client
 
 Connects to an existing WiFi network. Full functionality.

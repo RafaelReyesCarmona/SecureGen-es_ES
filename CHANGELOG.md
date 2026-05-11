@@ -1,5 +1,38 @@
 # Changelog
 
+## [2.3.0] — May 2026
+### Security Enhancements
+- **Duress PIN with memory zeroing** — multi-layer duress PIN triggers advanced memory 
+  zeroing; real vault is wiped and replaced with decoy accounts on duress entry
+- **Credential validation on registration and password change** — login name cannot 
+  appear inside the password; enforced at registration and password change
+- **Improved mimicry headers** — obfuscation layer now generates more convincing 
+  decoy Authorization/Session headers; fixed header obfuscation logic bug
+
+### Web Interface
+- **Password categories (folders)** — passwords can be organized into named categories 
+  in the web cabinet with folder-style navigation
+- **Security badges** — visual indicators on password entries: strength meter, 
+  duplicate detection, PIN-only flag, name-in-password warning
+- **Debug UI** — internal diagnostics panel (debug builds only)
+- **Display orientation setting** — screen rotation configurable from web cabinet
+- **Display Auto-Dim** — screen dim configurable from web cabinet
+- **BLE Pin Setting** — Deleted BLE pin setting, because it generates randoml. The setting was useless
+
+### Bug Fixes & Stability
+- Fixed BLE broadcasting page showing `0` instead of zero-padded PIN (e.g. `000006`)
+- Fixed web server not stopping in AP mode on exit
+- Fixed session lifecycle bug in AP mode (sessions persisting across AP restarts)
+- Fixed URL obfuscation mapping bug causing endpoint resolution failures
+
+### Documentation
+- Added [RTC Mastering Guide](docs/user/rtc_mastering.md) — DS3231 wiring diagrams, 
+  pin assignments for ESP32 and S3, enabling RTC in firmware, troubleshooting
+- Added [Porting Guide](docs/development/PORTING.md) — step-by-step instructions for 
+  adapting SecureGen to new ESP32/S3 boards: board header creation, platformio.ini 
+  configuration, capability flags, deep sleep wake pins, display geometry, 
+  security checklist, common mistakes
+
 ## [2.2.0] — April 2026
 
 ### Hardware Support

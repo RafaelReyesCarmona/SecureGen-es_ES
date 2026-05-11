@@ -278,6 +278,63 @@ bool ConfigManager::saveBootMode(const String& mode) {
     }
 }
 
+uint8_t ConfigManager::getDisplayRotation() {
+    if (LittleFS.exists(CONFIG_FILE)) {
+        fs::File configFile = LittleFS.open(CONFIG_FILE, "r");
+        if (configFile) {
+            JsonDocument doc;
+            DeserializationError error = deserializeJson(doc, configFile);
+            if (error == DeserializationError::Ok) {
+                uint8_t rotation = doc["display_rotation"] | 1; // Default to 1 (landscape)
+                configFile.close();
+                return rotation;
+            } else {
+                LOG_ERROR("ConfigManager", "Failed to parse display rotation config: " + String(error.c_str()));
+            }
+            configFile.close();
+        } else {
+            LOG_ERROR("ConfigManager", "Failed to open config file for display rotation reading");
+        }
+    }
+    return 1; // Default: rotation 1 (landscape, USB on right)
+}
+
+bool ConfigManager::saveDisplayRotation(uint8_t rotation) {
+    LOG_INFO("ConfigManager", "saveDisplayRotation() called with rotation: " + String(rotation));
+    JsonDocument doc;
+    
+    if (LittleFS.exists(CONFIG_FILE)) {
+        fs::File configFile = LittleFS.open(CONFIG_FILE, "r");
+        if (configFile) {
+            DeserializationError error = deserializeJson(doc, configFile);
+            if (error != DeserializationError::Ok) {
+                LOG_WARNING("ConfigManager", "Failed to parse existing config, creating new: " + String(error.c_str()));
+            }
+            configFile.close();
+        } else {
+            LOG_WARNING("ConfigManager", "Failed to open existing config file for reading");
+        }
+    }
+    
+    doc["display_rotation"] = rotation;
+    
+    fs::File configFile = LittleFS.open(CONFIG_FILE, "w");
+    if (configFile) {
+        size_t bytesWritten = serializeJson(doc, configFile);
+        configFile.close();
+        if (bytesWritten > 0) {
+            LOG_INFO("ConfigManager", "Display rotation saved successfully");
+            return true;
+        } else {
+            LOG_ERROR("ConfigManager", "Failed to write display rotation config data");
+            return false;
+        }
+    } else {
+        LOG_ERROR("ConfigManager", "Failed to open config file for display rotation writing");
+        return false;
+    }
+}
+
 
 
 uint16_t ConfigManager::getWebServerTimeout() {
@@ -607,6 +664,57 @@ bool ConfigManager::saveAutoLockTimeout(uint32_t timeout) {
         LOG_ERROR("ConfigManager", "Failed to open config file for auto lock timeout writing");
         return false;
     }
+}
+
+uint16_t ConfigManager::getDimTimeout() {
+    if (_dimTimeoutCached) {
+        return _cachedDimTimeout;
+    }
+    if (LittleFS.exists(CONFIG_FILE)) {
+        fs::File configFile = LittleFS.open(CONFIG_FILE, "r");
+        if (configFile) {
+            JsonDocument doc;
+            DeserializationError error = deserializeJson(doc, configFile);
+            if (error == DeserializationError::Ok) {
+                uint16_t timeout = doc["dim_timeout"] | 0;
+                configFile.close();
+                _cachedDimTimeout = timeout;
+                _dimTimeoutCached = true;
+                LOG_INFO("ConfigManager", "Loaded dim timeout: " + String(timeout) + " seconds");
+                return timeout;
+            }
+            configFile.close();
+        }
+    }
+    _cachedDimTimeout = 0;
+    _dimTimeoutCached = true;
+    return 0; // Default: Never dim
+}
+
+bool ConfigManager::saveDimTimeout(uint16_t timeout) {
+    LOG_INFO("ConfigManager", "saveDimTimeout() called with value: " + String(timeout) + " seconds");
+
+    _dimTimeoutCached = false;
+
+    JsonDocument doc;
+
+    if (LittleFS.exists(CONFIG_FILE)) {
+        fs::File configFile = LittleFS.open(CONFIG_FILE, "r");
+        if (configFile) {
+            deserializeJson(doc, configFile);
+            configFile.close();
+        }
+    }
+
+    doc["dim_timeout"] = timeout;
+
+    fs::File configFile = LittleFS.open(CONFIG_FILE, "w");
+    if (configFile) {
+        size_t bytesWritten = serializeJson(doc, configFile);
+        configFile.close();
+        return bytesWritten > 0;
+    }
+    return false;
 }
 
 // Session Duration Configuration

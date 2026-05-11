@@ -89,7 +89,7 @@ uint8_t PasswordManager::computeStrength(const String& password) {
     return 1;                  // weak
 }
 
-bool PasswordManager::addPassword(const String& name, const String& password) {
+bool PasswordManager::addPassword(const String& name, const String& password, const String& category) {
     if (name.isEmpty() || password.isEmpty()) {
         LOG_WARNING("PasswordManager", "Cannot add password with empty name or value");
         return false;
@@ -102,6 +102,7 @@ bool PasswordManager::addPassword(const String& name, const String& password) {
     PasswordEntry newPassword;
     newPassword.name = name;
     newPassword.password = password;
+    newPassword.category = category;
     newPassword.order = maxOrder + 1;
     // Compute strength and hash before storing
     newPassword.strength = computeStrength(password);
@@ -115,7 +116,7 @@ bool PasswordManager::addPassword(const String& name, const String& password) {
     return success;
 }
 
-bool PasswordManager::updatePassword(int index, const String& name, const String& password) {
+bool PasswordManager::updatePassword(int index, const String& name, const String& password, const String& category) {
     if (index < 0 || index >= passwords.size()) {
         LOG_WARNING("PasswordManager", "Invalid password index for update: " + String(index));
         return false;
@@ -126,6 +127,7 @@ bool PasswordManager::updatePassword(int index, const String& name, const String
     }
     passwords[index].name = name;
     passwords[index].password = password;
+    passwords[index].category = category;
     // Recompute strength and hash on update
     passwords[index].strength = computeStrength(password);
     passwords[index].pw_hash  = computePwHash(password);
@@ -237,6 +239,7 @@ std::vector<PasswordEntry> PasswordManager::getAllPasswordsForExport() {
         entry.order = obj["order"] | 0;
         entry.strength = obj["strength"] | 0;
         entry.pw_hash = obj["pw_hash"] | "";
+        entry.category = obj["category"] | "";  // backward-compat: old entries default to ""
         exportPasswords.push_back(entry);
     }
 
@@ -263,6 +266,7 @@ bool PasswordManager::replaceAllPasswords(const String& jsonContent) {
         entry.order = obj["order"] | currentOrder++;  // Используем существующий order или назначаем по порядку
         entry.strength = obj["strength"] | (uint8_t)0;
         entry.pw_hash  = obj["pw_hash"] | String("");
+        entry.category = obj["category"] | "";  // backward-compat: old entries default to ""
         // Recompute missing fields (handles legacy import files)
         if (entry.strength == 0 || entry.pw_hash.isEmpty()) {
             entry.strength = computeStrength(entry.password);
@@ -328,6 +332,7 @@ bool PasswordManager::loadPasswords() {
         entry.order = obj["order"] | currentOrder++;  // Используем существующий order или назначаем по порядку
         entry.strength = obj["strength"] | 0;
         entry.pw_hash = obj["pw_hash"] | "";
+        entry.category = obj["category"] | "";  // backward-compat: old entries default to ""
         // Migration: compute missing fields for legacy entries
         if (entry.strength == 0 || entry.pw_hash.isEmpty()) {
             entry.strength = computeStrength(entry.password);
@@ -353,6 +358,7 @@ bool PasswordManager::savePasswords() {
         obj["order"]    = entry.order;
         obj["strength"] = entry.strength;
         obj["pw_hash"]  = entry.pw_hash;
+        obj["category"] = entry.category;
     }
 
     String jsonData;

@@ -68,6 +68,9 @@ public:
 
     void setTheme(Theme theme); // New method to set the theme
     const ThemeColors* getCurrentThemeColors() const { return _currentThemeColors; } // Get current theme colors
+    
+    // Display rotation management
+    void applyRotation(); // Apply rotation setting from config and redraw
 
     // Deprecated, but kept for compatibility with other code
     void showMessage(const String& text, int x, int y, bool isError = false, int size = 1);
@@ -129,6 +132,13 @@ private:
 
     // Состояние для страницы "No Items"
     bool _isNoItemsPageActive = false;
+    bool _needsFullRedraw = false; // Set by applyRotation() to force main loop redraw
+
+public:
+    bool needsFullRedraw() const { return _needsFullRedraw; }
+    void clearFullRedrawFlag() { _needsFullRedraw = false; }
+
+private:
     
     // QR Code состояние
     bool _qrCodeActive = false;

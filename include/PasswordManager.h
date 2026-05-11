@@ -12,6 +12,7 @@ struct PasswordEntry {
     int order = 0;  // Порядок сортировки
     uint8_t strength = 0;   // 0=unknown, 1=weak, 2=medium, 3=strong
     String pw_hash = "";    // SHA256 first 8 bytes as hex (16 chars), for duplicate detection
+    String category = "";   // "web" | "app" | "local" | "key" | "" (means all)
 };
 
 class PasswordManager {
@@ -22,9 +23,9 @@ public:
     String  computePwHash(const String& password);
     uint32_t getRevision() const { return _revision; }
     
-    bool addPassword(const String& name, const String& password);
+    bool addPassword(const String& name, const String& password, const String& category = "");
     bool deletePassword(int index);
-    bool updatePassword(int index, const String& name, const String& password); // <-- ADDED
+    bool updatePassword(int index, const String& name, const String& password, const String& category = ""); // <-- ADDED
     bool reorderPasswords(const std::vector<std::pair<String, int>>& newOrder); // Изменение порядка
     std::vector<PasswordEntry> getAllPasswords();
     std::vector<PasswordEntry> getAllPasswordsForExport();

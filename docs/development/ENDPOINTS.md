@@ -106,11 +106,24 @@ Request: `{ "order": [2, 0, 1] }`
 Returns password list metadata. Passwords are not included — use `/api/passwords/get` to retrieve a specific entry.
 
 ```json
-{ "passwords": [ { "name": "Gmail", "username": "user@example.com" } ] }
+{
+  "passwords": [
+    {
+      "name": "Gmail",
+      "category": "web",
+      "strength": 2,
+      "pw_hash": "a1b2c3d4"
+    }
+  ]
+}
 ```
 
+Fields: `name` (string), `category` ("web"|"app"|"local"|"key"|""), `strength` (0–3), `pw_hash` (first 8 bytes of SHA-256, hex, for duplicate detection). Passwords are never included in the list response — use `/api/passwords/get`.
+
 ### POST /api/passwords/add 🔐 🛡️ 🔒
-Request: `{ "name": "...", "username": "...", "password": "..." }`
+Request: `{ "name": "...", "password": "...", "category": "web" }`
+
+Note: `category` optional — omit or pass "" for no category.
 
 ### POST /api/passwords/get 🔐 🛡️ 🔒
 Returns the plaintext password for one entry.  
@@ -118,10 +131,19 @@ Request: `{ "index": 0 }`
 Response: `{ "success": true, "password": "..." }`
 
 ### POST /api/passwords/update 🔐 🛡️ 🔒
-Request: `{ "index": 0, "name": "...", "username": "...", "password": "..." }`
+Request: `{ "index": 0, "name": "...", "password": "...", "category": "web" }`
 
 ### POST /api/passwords/delete 🔐 🛡️ 🔒
 Request: `{ "index": 0 }`
+
+### POST /api/passwords/reorder 🔐 🛡️ 🔒
+Reorder the password list.
+
+**Request:** 
+```json
+{ "order": [2, 0, 1] }
+```
+Array of original indices in desired new order.
 
 ---
 
@@ -164,21 +186,40 @@ Get or set screen timeout and auto lock timeout.
 
 GET response:
 ```json
-{ "display_timeout": 30, "auto_lock_timeout": 300 }
+{ "display_timeout": 30, "auto_lock_timeout": 300, "dim_timeout": 15 }
 ```
 
-`display_timeout` — seconds until screen turns off and device enters pseudo-sleep. `0` = Never.  
-Valid values: `0`, `15`, `30`, `60`, `300`, `1800`.
+`display_timeout` — seconds until screen turns off. Valid values: `0`, `15`, `30`, `60`, `300`, `1800`.
 
-`auto_lock_timeout` — seconds until device enters deep sleep and wipes RAM (requires PIN on wake). `0` = Never. Must be greater than `display_timeout` when both are non-zero. Auto lock timer starts from last activity — runs inside pseudo-sleep when `display_timeout > 0`, or directly in main loop when `display_timeout == 0`.  
-Valid values: `0`, `300`, `900`, `1800`, `3600`, `14400`.
+`auto_lock_timeout` — seconds until device enters deep sleep and wipes RAM. Valid values: `0`, `300`, `900`, `1800`, `3600`, `14400`.
 
-POST request: `{ "display_timeout": 30, "auto_lock_timeout": 300 }`  
-POST response: `{ "success": true, "message": "Display settings saved successfully!", "timeout": 30, "auto_lock_timeout": 300 }`
+`dim_timeout` — seconds until display brightness drops to 20% (auto-dim). Valid values: `0` (disabled), `5`, `10`, `15`, `30`, `60`, `300`. Constraint: `dim_timeout < display_timeout < auto_lock_timeout` (when each is non-zero).
+
+POST request: `{ "display_timeout": 30, "auto_lock_timeout": 300, "dim_timeout": 15 }`  
+POST response: `{ "success": true, "message": "Display settings saved successfully!", "timeout": 30, "auto_lock_timeout": 300, "dim_timeout": 15 }`
 
 ### GET|POST /api/clock_settings 🔐 (🛡️ on POST) 🔒
 Get or set POSIX timezone string.  
 Example: `{ "timezone": "EST5EDT,M3.2.0,M11.1.0" }`
+
+### GET|POST /api/display/rotation 🔐 (🛡️ on POST) 🔒
+Get or set the screen rotation.
+
+**GET response:**
+```json
+{ "rotation": 1 }
+```
+
+**POST request:**
+```json
+{ "rotation": 3 }
+```
+
+Values: `1` = Normal landscape (default, USB on right), `3` = Flipped 180°.  
+Full range `0–3` supported via API (0=portrait, 2=portrait inverted) but only 1 and 3 are exposed in the web UI.
+
+Change applies immediately — display redraws and button mappings swap automatically.  
+Available on both T-Display ESP32 and T-Display-S3.
 
 ### GET|POST /api/ble_settings 🔐 (🛡️ on POST) 🔒
 Get or set BLE device name.
@@ -224,6 +265,29 @@ Enable requires factory reset confirmation. Disable requires physical PIN entry 
 
 ### POST /api/ble_pin_update 🔐 🛡️ 🔒
 Request: `{ "ble_pin_enabled": true, "ble_pin": "123456" }`
+
+### POST /api/duress_pin_update 🔐 🛡️ 🔒
+Set or disable the Duress PIN.
+
+**Enable / set:**
+```json
+{ "duress_pin_enabled": "true", "duress_pin": "123456" }
+```
+
+**Disable:**
+```json
+{ "duress_pin_enabled": "false" }
+```
+
+The Duress PIN must be the same length as the current Startup PIN (4–10 digits) and must consist of digits only. When entered at startup, the device shows "PIN OK" and then permanently erases all data (keys, passwords, device key, WiFi, BLE NVS, sessions, config) before restarting.
+The entire LittleFS partition (~3.9 MB) is also wiped at the hardware level (`esp_partition_erase_range`) — file recovery via flash reader is not possible.
+
+Status fields returned by `GET /api/pincode_settings`:
+- `duressPinEnabled` — `true` / `false`
+- `duressPinConfigured` — whether `/duress_pin.hash` exists and is valid
+
+**Response 200:** `{ "success": true, "message": "Duress PIN saved successfully!" }`  
+**Response 400:** `{ "success": false, "message": "Duress PIN must be N digits" }`
 
 ### POST /api/change_password 🔐 🛡️ 🔒
 Request: `{ "current_password": "...", "new_password": "..." }`

@@ -1,4 +1,5 @@
 #include "crypto_manager.h"
+#include "secure_utils.h"
 #include "config.h" // <-- ADDED for BLE PIN constants
 #include "config_manager.h" // <-- ADDED for session duration
 #include "log_manager.h"
@@ -98,6 +99,10 @@ String CryptoManager::encryptWithPassword(const String& plaintext, const String&
     String output;
     serializeJson(doc, output);
     LOG_INFO("CryptoManager", "Data successfully encrypted for export.");
+    
+    secure_memzero(derived_key, sizeof(derived_key));
+    std::fill(padded_input.begin(), padded_input.end(), 0);
+    padded_input.clear();
     return output;
 }
 
@@ -172,7 +177,16 @@ String CryptoManager::decryptWithPassword(const String& encryptedJson, const Str
 
     size_t plain_len = decrypted_padded.size() - padding_len;
     LOG_INFO("CryptoManager", "Data successfully decrypted from import.");
-    return String((char*)decrypted_padded.data(), plain_len);
+    
+    // Create result string BEFORE clearing sensitive data
+    String result((char*)decrypted_padded.data(), plain_len);
+    
+    // Clean up sensitive data
+    secure_memzero(derived_key, sizeof(derived_key));
+    std::fill(decrypted_padded.begin(), decrypted_padded.end(), 0);
+    decrypted_padded.clear();
+    
+    return result;
 }
 
 
@@ -445,6 +459,8 @@ bool CryptoManager::encryptDeviceKeyWithPin(const String& pin) {
     
     if (ret != 0) {
         LOG_ERROR("CryptoManager", "PBKDF2 derivation failed");
+        secure_memzero(derived_key, sizeof(derived_key));
+        secure_memzero(plaintext, sizeof(plaintext));
         return false;
     }
     
@@ -460,6 +476,8 @@ bool CryptoManager::encryptDeviceKeyWithPin(const String& pin) {
     fs::File keyFile = LittleFS.open(DEVICE_KEY_FILE, "w");
     if (!keyFile) {
         LOG_ERROR("CryptoManager", "Failed to open device.key for writing");
+        secure_memzero(derived_key, sizeof(derived_key));
+        secure_memzero(plaintext, sizeof(plaintext));
         return false;
     }
     
@@ -470,6 +488,8 @@ bool CryptoManager::encryptDeviceKeyWithPin(const String& pin) {
     keyFile.write(encrypted, encrypted_len);
     keyFile.close();
     
+    secure_memzero(derived_key, sizeof(derived_key));
+    secure_memzero(plaintext, sizeof(plaintext));
     LOG_INFO("CryptoManager", "Device key encrypted with AES-256-CBC (v3, 81 bytes)");
     
     return true;
@@ -531,6 +551,7 @@ bool CryptoManager::decryptDeviceKeyWithPin(const String& pin) {
         
         if (ret != 0) {
             LOG_ERROR("CryptoManager", "PBKDF2 failed");
+            secure_memzero(derived_key, sizeof(derived_key));
             return false;
         }
         
@@ -560,10 +581,18 @@ bool CryptoManager::decryptDeviceKeyWithPin(const String& pin) {
         
         if (memcmp(computed_hash, plaintext, 4) != 0) {
             LOG_ERROR("CryptoManager", "PIN verification failed (checksum mismatch)");
+            secure_memzero(derived_key, sizeof(derived_key));
+            secure_memzero(plaintext, sizeof(plaintext));
+            secure_memzero(decrypted_key, sizeof(decrypted_key));
+            secure_memzero(computed_hash, sizeof(computed_hash));
             return false;
         }
         
         memcpy(_deviceKey, decrypted_key, 32);
+        secure_memzero(derived_key, sizeof(derived_key));
+        secure_memzero(plaintext, sizeof(plaintext));
+        secure_memzero(decrypted_key, sizeof(decrypted_key));
+        secure_memzero(computed_hash, sizeof(computed_hash));
         LOG_INFO("CryptoManager", "Device key decrypted OK (AES-256-CBC v3)");
         return true;
         
@@ -609,7 +638,8 @@ bool CryptoManager::decryptDeviceKeyWithPin(const String& pin) {
         esp_task_wdt_reset();
         
         if (ret != 0) {
-            LOG_ERROR("CryptoManager", "PBKDF2 derivation failed");
+            LOG_ERROR("CryptoManager", "PBKDF2 failed (v2)");
+            secure_memzero(derived_key, sizeof(derived_key));
             return false;
         }
         
@@ -641,12 +671,20 @@ bool CryptoManager::decryptDeviceKeyWithPin(const String& pin) {
         // Сравниваем первые 4 байта hash с checksum в plaintext
         if (memcmp(computed_hash, plaintext, 4) != 0) {
             LOG_ERROR("CryptoManager", "❌ PIN verification failed - incorrect PIN!");
+            secure_memzero(derived_key, sizeof(derived_key));
+            secure_memzero(plaintext, sizeof(plaintext));
+            secure_memzero(decrypted_key, sizeof(decrypted_key));
+            secure_memzero(computed_hash, sizeof(computed_hash));
             return false;
         }
         
         // Checksum совпадает - PIN правильный, копируем ключ
         memcpy(_deviceKey, decrypted_key, 32);
         
+        secure_memzero(derived_key, sizeof(derived_key));
+        secure_memzero(plaintext, sizeof(plaintext));
+        secure_memzero(decrypted_key, sizeof(decrypted_key));
+        secure_memzero(computed_hash, sizeof(computed_hash));
         LOG_INFO("CryptoManager", "✅ Device key decrypted and verified successfully");
         return true;
         
@@ -896,6 +934,7 @@ String CryptoManager::hashPassword(const String& password) {
     String salt_hex = bytesToHex(salt, salt_len);
     String key_hex = bytesToHex(derived_key, key_len);
 
+    secure_memzero(derived_key, sizeof(derived_key));
     return salt_hex + ":" + key_hex;
 }
 
@@ -944,6 +983,7 @@ bool CryptoManager::verifyPassword(const String& password, const String& salt_an
     // 3. Compare the new key with the original one
     String derived_key_hex = bytesToHex(derived_key, key_len);
     
+    secure_memzero(derived_key, sizeof(derived_key));
     return derived_key_hex.equals(original_hash_hex);
 }
 
@@ -1092,7 +1132,7 @@ bool CryptoManager::saveBlePin(uint32_t pin) {
         char pinStr[7];
         snprintf(pinStr, sizeof(pinStr), "%06u", pin);
         
-        LOG_INFO("CryptoManager", "Saving BLE Bonding PIN (value protected)");
+        LOG_INFO("CryptoManager", "Saving BLE pairing PIN (value protected)");
         
         JsonDocument doc;
         doc["ble_pin"] = String(pinStr); // Сохраняем как строку
@@ -1179,7 +1219,7 @@ uint32_t CryptoManager::loadBlePin() {
         String pinStr = doc["ble_pin"] | "123456";
         uint32_t pin = pinStr.toInt();
         
-        LOG_INFO("CryptoManager", "BLE Bonding PIN loaded successfully (value protected)");
+        LOG_INFO("CryptoManager", "BLE pairing PIN loaded successfully (value protected)");
         return pin;
         
     } catch (const std::exception& e) {
@@ -1373,6 +1413,105 @@ void CryptoManager::setDeviceBlePinEnabled(bool enabled) {
         LOG_ERROR("CryptoManager", "Exception updating Device BLE PIN enabled state: " + String(e.what()));
     }
 }
+
+// ─── Duress PIN ───────────────────────────────────────────────────────────────
+// File layout (50 bytes): [0x01 version][0x01/0x00 enabled][16 salt][32 hash]
+
+static int _readDuressPinExpectedLength() {
+    int len = 6;
+    if (LittleFS.exists("/.sys_ui_prefs")) {
+        fs::File f = LittleFS.open("/.sys_ui_prefs", "r");
+        if (f) { int v = f.readStringUntil('\n').toInt(); f.close(); if (v >= 4 && v <= 10) len = v; }
+    }
+    return len;
+}
+
+bool CryptoManager::saveDuressPin(const String& pin) {
+    int expected = _readDuressPinExpectedLength();
+    if ((int)pin.length() != expected) return false;
+    for (char c : pin) { if (!isdigit(c)) return false; }
+    if (!_isKeyInitialized) { LOG_ERROR("CryptoManager","saveDuressPin: key not ready"); return false; }
+    uint8_t salt[16];
+    secureRandom(salt, 16);
+    uint8_t hash[32];
+    mbedtls_md_context_t ctx;
+    mbedtls_md_init(&ctx);
+    mbedtls_md_setup(&ctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), 1);
+    int ret = mbedtls_pkcs5_pbkdf2_hmac(&ctx, (const unsigned char*)pin.c_str(), pin.length(),
+                                         salt, 16, PBKDF2_ITERATIONS_PIN, 32, hash);
+    mbedtls_md_free(&ctx);
+    if (ret != 0) { LOG_ERROR("CryptoManager","saveDuressPin: PBKDF2 failed"); return false; }
+    File f = LittleFS.open("/duress_pin.hash", "w");
+    if (!f) { LOG_ERROR("CryptoManager","saveDuressPin: cannot create file"); return false; }
+    uint8_t header[2] = {0x01, 0x01};
+    size_t w1 = f.write(header, 2);
+    size_t w2 = f.write(salt, 16);
+    size_t w3 = f.write(hash, 32);
+    f.close();
+    if (w1 != 2 || w2 != 16 || w3 != 32) {
+        LOG_ERROR("CryptoManager", "saveDuressPin: write failed, removing incomplete file");
+        LittleFS.remove("/duress_pin.hash");
+        return false;
+    }
+    LOG_INFO("CryptoManager","Duress PIN saved");
+    return true;
+}
+
+bool CryptoManager::verifyDuressPin(const String& pin) {
+    int expected = _readDuressPinExpectedLength();
+    if ((int)pin.length() != expected) return false;
+    for (char c : pin) { if (!isdigit(c)) return false; }
+    if (!LittleFS.exists("/duress_pin.hash")) return false;
+    File f = LittleFS.open("/duress_pin.hash", "r");
+    if (!f || f.size() != 50) { if (f) f.close(); return false; }
+    uint8_t buf[50]; f.read(buf, 50); f.close();
+    if (buf[0] != 0x01 || buf[1] != 0x01) {
+        secure_memzero(buf, sizeof(buf));
+        return false;
+    }
+    uint8_t computed[32];
+    mbedtls_md_context_t ctx;
+    mbedtls_md_init(&ctx);
+    mbedtls_md_setup(&ctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), 1);
+    int ret = mbedtls_pkcs5_pbkdf2_hmac(&ctx, (const unsigned char*)pin.c_str(), pin.length(),
+                                         buf+2, 16, PBKDF2_ITERATIONS_PIN, 32, computed);
+    mbedtls_md_free(&ctx);
+    if (ret != 0) {
+        secure_memzero(buf, sizeof(buf));
+        secure_memzero(computed, sizeof(computed));
+        return false;
+    }
+    int diff = 0;
+    for (int i = 0; i < 32; i++) diff |= (buf[18+i] ^ computed[i]);
+    secure_memzero(buf, sizeof(buf));
+    secure_memzero(computed, sizeof(computed));
+    return (diff == 0);
+}
+
+bool CryptoManager::isDuressPinConfigured() {
+    if (!LittleFS.exists("/duress_pin.hash")) return false;
+    File f = LittleFS.open("/duress_pin.hash", "r");
+    bool ok = (f && f.size() == 50); if (f) f.close(); return ok;
+}
+
+bool CryptoManager::isDuressPinEnabled() {
+    if (!LittleFS.exists("/duress_pin.hash")) return false;
+    File f = LittleFS.open("/duress_pin.hash", "r");
+    if (!f || f.size() != 50) { if (f) f.close(); return false; }
+    uint8_t h[2]; f.read(h, 2); f.close();
+    return (h[0] == 0x01 && h[1] == 0x01);
+}
+
+bool CryptoManager::setDuressPinEnabled(bool enabled) {
+    if (!LittleFS.exists("/duress_pin.hash")) return false;
+    File f = LittleFS.open("/duress_pin.hash", "r+");
+    if (!f || f.size() != 50) { if (f) f.close(); return false; }
+    f.seek(1); f.write(enabled ? 0x01 : 0x00); f.close();
+    LOG_INFO("CryptoManager","Duress PIN enabled=" + String(enabled));
+    return true;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 bool CryptoManager::verifyDeviceBlePin(const String& pin) {
     LOG_INFO("CryptoManager", "Verifying Device BLE PIN...");
@@ -1679,8 +1818,10 @@ bool CryptoManager::isSessionValidEpoch(unsigned long epochCreatedTime, unsigned
     
     // Проверяем что время синхронизировано (не 1970 год)
     if (currentEpoch < 1000000000) { // Примерно 2001 год
-        LOG_WARNING("CryptoManager", "System time not synchronized, treating session as expired");
-        return false;
+        // No wall-clock time available (AP mode without RTC, or time not yet synced).
+        // Cannot validate epoch age — treat session as valid for current boot only.
+        LOG_DEBUG("CryptoManager", "System time not synchronized — session valid for current boot only (until-reboot mode)");
+        return true;
     }
     
     unsigned long sessionAge = currentEpoch - epochCreatedTime;
@@ -1697,7 +1838,7 @@ bool CryptoManager::isSessionValidEpoch(unsigned long epochCreatedTime, unsigned
 
 void CryptoManager::wipeDeviceKey() {
     if (_isKeyInitialized) {
-        memset(_deviceKey, 0, sizeof(_deviceKey));
+        secure_memzero(_deviceKey, sizeof(_deviceKey));
         _isKeyInitialized = false;
     }
 }

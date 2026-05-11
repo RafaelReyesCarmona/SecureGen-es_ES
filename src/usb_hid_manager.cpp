@@ -18,7 +18,8 @@ void UsbHidManager::end() {
 }
 
 bool UsbHidManager::isConnected() {
-  return _started;
+  if (!_started) return false;
+  return tud_hid_ready();
 }
 
 void UsbHidManager::sendPassword(const char* password) {
