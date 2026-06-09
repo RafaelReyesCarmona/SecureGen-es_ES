@@ -64,6 +64,63 @@ Filesystem access without the PIN yields only ciphertext.
 
 **Implementation:** `src/crypto_manager.cpp`
 
+### Hidden Space (Layer 1 — dual-slot extension) 
+
+The device key file supports two independent encrypted slots. Each slot 
+holds a separate 32-byte device key protected by its own PIN and PBKDF2 
+salt. Slots share the same file but are cryptographically independent. 
+device.key (161 bytes total) 
+├── Slot A [0..80]  — v3: [0x03][salt:16][IV:16][AES-CBC(key_A):48] 
+└── Slot B [81..160] —     [salt:16][IV:16][AES-CBC(key_B):48] 
+
+At boot, `unlockDeviceKeyWithPin()` tries PIN against Slot A first, 
+then Slot B. The space that decrypts successfully determines which device 
+key loads into RAM. The other slot's content is never read again during 
+that session. 
+
+**File path isolation** 
+
+Space B data files use HMAC-SHA256 derived names: 
+path = "/" + hex(HMAC-SHA256(device_key_B, logical_name)[0:4]) + ".enc" 
+
+Example: `logical_name = "keys"` → `/d7ba9eec.enc` 
+
+These paths are computed at runtime after unlock. Without `device_key_B` 
+an observer cannot link any file to Space B or determine which logical 
+name it corresponds to. 
+
+Logical names covered: `keys`, `passwords`, `wifi`, `session`, `ble_pin`, 
+`device_ble_pin`, `duress_pin`, `web_admin`, `pin_config`, `sentinel`. 
+
+**Provisioning detection** 
+
+Hidden space provisioning is detected via a sentinel file at the 
+HMAC-derived path for `"sentinel"`. No explicit flag or counter is stored. 
+The sentinel path is computable only from Space A's device key — 
+indistinguishable from other HMAC files to anyone without `device_key_A`. 
+
+**Wipe** 
+
+`wipeHiddenSpace()` performs a complete, ordered cleanup: 
+
+1. Overwrite Slot B (80 bytes) with CSPRNG random data 
+2. Derive and delete all 10 HMAC-path files 
+3. Delete `/.conn_cache` (shared WiFi cache) 
+4. Delete `/.net_prefs` (WiFi sharing preference) 
+5. Clear `_hiddenSpaceProvisioned` and `_shareWifiWithHiddenSpace` in RAM 
+
+**Known limitations** 
+
+| Limitation | Notes | 
+|------------|-------| 
+| `/.net_prefs` reveals WiFi sharing state | Does not reveal Space B existence; encrypted with device key A | 
+| Space A PIN holder can infer Space B exists | Via sentinel path derivation; not detectable without device key A | 
+| Shared global config | Theme, BLE name, mDNS, RTC — by design; device appears uniform | 
+
+**Implementation:** `src/crypto_manager.cpp` — `tryDecryptSlot()`, 
+`createHiddenSpace()`, `wipeHiddenSpace()`, `initSpacePaths()`, 
+`deriveSpaceBSentinelPath()`
+
 ### PBKDF2 Parameters
 
 Defined in `include/config.h`:

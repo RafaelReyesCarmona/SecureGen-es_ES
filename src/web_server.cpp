@@ -739,16 +739,7 @@ void WebServerManager::start() {
         if (!isAuthenticated(request)) return request->redirect("/login");
         resetActivityTimer(); // Пользователь заходит на главную страницу
         
-        // Auto-initialize secure session for main page
-        if (shouldInitializeSecureSession(request)) {
-            initializeSecureSession(request);
-            
-            String html = String(PAGE_INDEX);
-            injectSecureInitScript(request, html);
-            request->send(200, "text/html", html);
-        } else {
-            request->send_P(200, "text/html", PAGE_INDEX);
-        }
+        request->send_P(200, "text/html", PAGE_INDEX);
     });
 
     // 🖼️ Splash Screen Management Page
@@ -1974,7 +1965,8 @@ void WebServerManager::start() {
                 obj["password"] = entry.password; // Добавляем пароли для корректного отображения в веб-интерфейсе
                 obj["strength"] = entry.strength;
                 obj["pw_hash"] = entry.pw_hash;
-                obj["category"] = entry.category;
+                obj["category"]  = entry.category;
+                obj["auto_send"] = entry.auto_send;
             }
             String output;
             serializeJson(doc, output);
@@ -2064,12 +2056,25 @@ void WebServerManager::start() {
                             category = decryptedBody.substring(categoryStart + 9, categoryEnd); // skip "category="
                         }
                         
+                        bool autoSendVal = false;
+                        int autoSendStart = decryptedBody.indexOf("auto_send=");
+                        if (autoSendStart != -1) {
+                            autoSendStart += 10; // length of "auto_send="
+                            int autoSendEnd = decryptedBody.indexOf("&", autoSendStart);
+                            if (autoSendEnd == -1) autoSendEnd = decryptedBody.length();
+                            String autoSendStr = decryptedBody.substring(autoSendStart, autoSendEnd);
+                            autoSendVal = (autoSendStr == "1" || autoSendStr == "true");
+                        }
+                        
                         // URL decode
                         name.replace("+", " ");
                         password.replace("+", " ");
                         category.replace("+", " ");
                         
                         LOG_DEBUG("WebServer", "🔐 Parsed password add: name=" + name + ", password length=" + String(password.length()));
+                        
+                        passwordManager.addPassword(name, password, category, autoSendVal);
+                        return request->send(200, "text/plain", "Password added securely");
                     } else {
                         return request->send(400, "text/plain", "Invalid decrypted password add format");
                     }
@@ -2081,22 +2086,27 @@ void WebServerManager::start() {
 #endif
             {
                 // Обычный незашифрованный запрос - читаем параметры
+                bool autoSendVal = false;
                 if (request->hasParam("name", true) && request->hasParam("password", true)) {
                     name = request->getParam("name", true)->value();
                     password = request->getParam("password", true)->value();
                     if (request->hasParam("category", true)) {
                         category = request->getParam("category", true)->value();
                     }
+                    if (request->hasParam("auto_send", true)) {
+                        String s = request->getParam("auto_send", true)->value();
+                        autoSendVal = (s == "1" || s == "true");
+                    }
                 } else {
                     return request->send(400, "text/plain", "Missing required parameters");
                 }
+                
+                if (name.isEmpty() || password.isEmpty()) {
+                    return request->send(400, "text/plain", "Name and password cannot be empty");
+                }
+                
+                passwordManager.addPassword(name, password, category, autoSendVal);
             }
-            
-            if (name.isEmpty() || password.isEmpty()) {
-                return request->send(400, "text/plain", "Name and password cannot be empty");
-            }
-            
-            passwordManager.addPassword(name, password, category);
             
             String response = "Password added successfully!";
             
@@ -2242,7 +2252,8 @@ void WebServerManager::start() {
                     JsonDocument doc;
                     doc["name"] = passwords[index].name;
                     doc["password"] = passwords[index].password;
-                    doc["category"] = passwords[index].category;
+                    doc["category"]  = passwords[index].category;
+                    doc["auto_send"] = passwords[index].auto_send;
                     String output;
                     serializeJson(doc, output);
                     
@@ -2278,6 +2289,8 @@ void WebServerManager::start() {
             if (!verifyCsrfToken(request)) return request->send(403, "text/plain", "CSRF token mismatch");
             
             int indexVal;
+            String response = "";
+            int statusCode = 200;
             String name, password, category;
             
 #ifdef SECURE_LAYER_ENABLED
@@ -2324,12 +2337,34 @@ void WebServerManager::start() {
                             category = decryptedBody.substring(categoryStart + 9, categoryEnd); // skip "category="
                         }
                         
+                        bool autoSendVal = false;
+                        int autoSendStart = decryptedBody.indexOf("auto_send=");
+                        if (autoSendStart != -1) {
+                            autoSendStart += 10; // length of "auto_send="
+                            int autoSendEnd = decryptedBody.indexOf("&", autoSendStart);
+                            if (autoSendEnd == -1) autoSendEnd = decryptedBody.length();
+                            String autoSendStr = decryptedBody.substring(autoSendStart, autoSendEnd);
+                            autoSendVal = (autoSendStr == "1" || autoSendStr == "true");
+                        }
+                        
                         // URL decode
                         name.replace("+", " ");
                         password.replace("+", " ");
                         category.replace("+", " ");
                         
                         LOG_DEBUG("WebServer", "🔐 Parsed: index=" + String(indexVal) + ", name=" + name + ", password length=" + String(password.length()));
+                        
+                        if (passwordManager.updatePassword(indexVal, name, password, category, autoSendVal)) {
+                            LOG_INFO("WebServer", "Password entry updated successfully securely");
+                            response = "Password updated successfully!";
+                            statusCode = 200;
+                        } else {
+                            LOG_ERROR("WebServer", "Failed to update password entry securely");
+                            response = "Failed to update password";
+                            statusCode = 500;
+                        }
+                        
+                        // Прямой возврат здесь для зашифрованного пути (через блок логики ниже)
                     } else {
                         return request->send(400, "text/plain", "Invalid decrypted password data format");
                     }
@@ -2341,6 +2376,7 @@ void WebServerManager::start() {
 #endif
             {
                 // Обычный незашифрованный запрос
+                bool autoSendVal = false;
                 if (request->hasParam("index", true) && request->hasParam("name", true) && request->hasParam("password", true)) {
                     indexVal = request->getParam("index", true)->value().toInt();
                     name = request->getParam("name", true)->value();
@@ -2348,24 +2384,25 @@ void WebServerManager::start() {
                     if (request->hasParam("category", true)) {
                         category = request->getParam("category", true)->value();
                     }
+                    if (request->hasParam("auto_send", true)) {
+                        String s = request->getParam("auto_send", true)->value();
+                        autoSendVal = (s == "1" || s == "true");
+                    }
                 } else {
                     return request->send(400, "text/plain", "Missing required parameters");
                 }
-            }
-            
-            LOG_INFO("WebServer", "Password update requested for entry at index " + String(indexVal));
-            
-            String response;
-            int statusCode;
-            
-            if (passwordManager.updatePassword(indexVal, name, password, category)) {
-                LOG_INFO("WebServer", "Password entry updated successfully");
-                response = "Password updated successfully!";
-                statusCode = 200;
-            } else {
-                LOG_ERROR("WebServer", "Failed to update password entry");
-                response = "Failed to update password";
-                statusCode = 500;
+                
+                LOG_INFO("WebServer", "Password update requested for entry at index " + String(indexVal));
+                
+                if (passwordManager.updatePassword(indexVal, name, password, category, autoSendVal)) {
+                    LOG_INFO("WebServer", "Password entry updated successfully");
+                    response = "Password updated successfully!";
+                    statusCode = 200;
+                } else {
+                    LOG_ERROR("WebServer", "Failed to update password entry");
+                    response = "Failed to update password";
+                    statusCode = 500;
+                }
             }
             
 #ifdef SECURE_LAYER_ENABLED
@@ -2559,7 +2596,8 @@ void WebServerManager::start() {
                 obj["password"] = entry.password;
                 obj["strength"] = entry.strength;
                 obj["pw_hash"] = entry.pw_hash;
-                obj["category"] = entry.category;
+                obj["category"]  = entry.category;
+                obj["auto_send"] = entry.auto_send;
             }
             String plaintext;
             serializeJson(doc, plaintext);
@@ -3589,6 +3627,10 @@ void WebServerManager::start() {
                             LittleFS.remove("/device_ble_pin.json.enc");
                             LittleFS.remove("/duress_pin.hash");
                             LittleFS.remove("/session.json.enc");
+                            LittleFS.remove("/.net_prefs");
+                            LittleFS.remove("/.conn_cache");
+                            LittleFS.remove("/theme_pref.json");
+                            LittleFS.remove("/startup_pref.json");
                             
                             // URL Obfuscation: Удаление boot counter и всех mappings
                             LOG_INFO("WebServer", "Clearing URL obfuscation data...");
@@ -3611,6 +3653,17 @@ void WebServerManager::start() {
                             // Очистка NVS partition (BLE bonding keys)
                             LOG_INFO("WebServer", "Clearing NVS partition...");
                             nvs_flash_erase_partition("nvs");
+                            
+                            // ═══ FORMAT LITTLEFS TO REMOVE ALL FILES INCLUDING SPACE B ═══
+                            LOG_INFO("WebServer", "Formatting LittleFS to ensure complete wipe...");
+                            LittleFS.end();
+                            LittleFS.format();
+                            LittleFS.begin(false);
+                            LOG_INFO("WebServer", "LittleFS formatted - all files removed");
+                            
+                            // ═══ SECURE MEMORY ZEROING ═══
+                            LOG_INFO("WebServer", "Wiping device key from memory...");
+                            CryptoManager::getInstance().wipeDeviceKey();
                             
                             LOG_INFO("WebServer", "All data files deleted for factory reset");
                             
@@ -3903,8 +3956,24 @@ void WebServerManager::start() {
                 bool allDigits = ((int)duressPinStr.length() == expected);
                 for (char c : duressPinStr) { if (!isdigit(c)) { allDigits = false; break; } }
                 if (!allDigits) { message = "Duress PIN must be " + String(expected) + " digits"; statusCode = 400; success = false; }
-                else if (CryptoManager::getInstance().saveDuressPin(duressPinStr)) { message = "Duress PIN saved successfully!"; LOG_INFO("WebServer","Duress PIN saved"); }
-                else { message = "Failed to save Duress PIN"; statusCode = 500; success = false; }
+                else {
+                    // ═══ COLLISION CHECK: Reject if duress PIN matches Space A or Space B ═══
+                    // Duress check runs FIRST at boot — if duress PIN == Space B PIN,
+                    // entering Space B PIN would trigger wipe instead of loading Space B
+                    
+                    bool matchesSlotA = CryptoManager::getInstance().wouldUnlockSlot(duressPinStr, 0); // SLOT_A_OFFSET = 0
+                    bool matchesSlotB = CryptoManager::getInstance().isHiddenSpaceProvisioned() &&
+                                        CryptoManager::getInstance().wouldUnlockSlot(duressPinStr, 80); // SLOT_B_OFFSET = 80
+                    
+                    if (matchesSlotA || matchesSlotB) {
+                        message = "Duress PIN conflicts with space PIN - choose different";
+                        statusCode = 400;
+                        success = false;
+                        LOG_WARNING("WebServer", "Duress PIN rejected: conflicts with " + String(matchesSlotA ? "Space A" : "Space B"));
+                    }
+                    else if (CryptoManager::getInstance().saveDuressPin(duressPinStr)) { message = "Duress PIN saved successfully!"; LOG_INFO("WebServer","Duress PIN saved"); }
+                    else { message = "Failed to save Duress PIN"; statusCode = 500; success = false; }
+                }
             } else if (!hasDuressPin && duressPinEnabledProvided && !duressPinEnabled) {
                 if (CryptoManager::getInstance().isDuressPinConfigured()) { CryptoManager::getInstance().setDuressPinEnabled(false); message = "Duress PIN disabled successfully!"; LOG_INFO("WebServer","Duress PIN disabled"); }
                 else { message = "Duress PIN not configured"; statusCode = 400; success = false; }
@@ -4062,7 +4131,26 @@ void WebServerManager::start() {
     server.on("/api/hid-mode", HTTP_GET, [this](AsyncWebServerRequest *request){
         if (!isAuthenticated(request)) return request->send(401);
         if (!verifyCsrfToken(request)) return request->send(403);
-        String mode = configManager.getDefaultHidMode();
+        
+        // Try per-space file first
+        String mode;
+        String hidPath = CryptoManager::getInstance().getSpacePath("hid_mode");
+        if (LittleFS.exists(hidPath)) {
+            fs::File hf = LittleFS.open(hidPath, "r");
+            if (hf) {
+                JsonDocument hdoc;
+                if (deserializeJson(hdoc, hf) == DeserializationError::Ok) {
+                    mode = hdoc["mode"] | "";
+                }
+                hf.close();
+            }
+        }
+        
+        // Fallback: use global config for both spaces
+        if (mode.length() == 0) {
+            mode = configManager.getDefaultHidMode();
+        }
+        
         JsonDocument doc;
         doc["hid_mode"] = mode;
         String out;
@@ -4080,7 +4168,24 @@ void WebServerManager::start() {
         if (mode != "ble" && mode != "usb") {
             return request->send(400, "application/json", "{\"error\":\"Invalid hid_mode\"}");
         }
-        bool ok = configManager.saveDefaultHidMode(mode);
+        
+        // Save to per-space file
+        String hidPath = CryptoManager::getInstance().getSpacePath("hid_mode");
+        JsonDocument hdoc;
+        hdoc["mode"] = mode;
+        fs::File hf = LittleFS.open(hidPath, "w");
+        bool ok = false;
+        if (hf) {
+            serializeJson(hdoc, hf);
+            hf.close();
+            ok = true;
+        }
+        
+        // Keep global config in sync only for Space A
+        if (CryptoManager::getInstance().getActiveSpace() == ActiveSpace::A) {
+            configManager.saveDefaultHidMode(mode);
+        }
+        
         JsonDocument resp;
         resp["success"] = ok;
         resp["hid_mode"] = mode;
@@ -4101,7 +4206,26 @@ void WebServerManager::start() {
     server.on("/api/boot-mode", HTTP_GET, [this](AsyncWebServerRequest *request){
         if (!isAuthenticated(request)) return request->send(401);
         if (!verifyCsrfToken(request)) return request->send(403);
-        String mode = configManager.getBootMode();
+        
+        // Try per-space file first
+        String mode;
+        String bootPath = CryptoManager::getInstance().getSpacePath("boot_mode");
+        if (LittleFS.exists(bootPath)) {
+            fs::File bf = LittleFS.open(bootPath, "r");
+            if (bf) {
+                JsonDocument bdoc;
+                if (deserializeJson(bdoc, bf) == DeserializationError::Ok) {
+                    mode = bdoc["mode"] | "";
+                }
+                bf.close();
+            }
+        }
+        
+        // Fallback: use global config for both spaces
+        if (mode.length() == 0) {
+            mode = configManager.getBootMode();
+        }
+        
         JsonDocument resp;
         resp["boot_mode"] = mode;
         String out; serializeJson(resp, out);
@@ -4118,7 +4242,24 @@ void WebServerManager::start() {
         if (mode != "wifi" && mode != "ap" && mode != "offline") {
             return request->send(400, "application/json", "{\"error\":\"Invalid boot_mode\"}");
         }
-        bool ok = configManager.saveBootMode(mode);
+        
+        // Save to per-space file
+        String bootPath = CryptoManager::getInstance().getSpacePath("boot_mode");
+        JsonDocument bdoc;
+        bdoc["mode"] = mode;
+        fs::File bf = LittleFS.open(bootPath, "w");
+        bool ok = false;
+        if (bf) {
+            serializeJson(bdoc, bf);
+            bf.close();
+            ok = true;
+        }
+        
+        // Keep global config in sync only for Space A
+        if (CryptoManager::getInstance().getActiveSpace() == ActiveSpace::A) {
+            configManager.saveBootMode(mode);
+        }
+        
         JsonDocument resp;
         resp["success"] = ok;
         resp["boot_mode"] = mode;
@@ -4131,6 +4272,284 @@ void WebServerManager::start() {
             request->_tempObject = doc;
         } else { delete doc; }
     });
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // HIDDEN SPACE (DUAL-SLOT) MANAGEMENT
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    // GET /api/hidden_space - Get hidden space status (URL OBFUSCATION)
+    URLObfuscationIntegration::registerDualEndpoint(server, "/api/hidden_space", HTTP_GET,
+        [this](AsyncWebServerRequest *request){
+        if (!isAuthenticated(request)) return request->send(401);
+        if (!verifyCsrfToken(request)) return request->send(403);
+        
+        CryptoManager& crypto = CryptoManager::getInstance();
+        ActiveSpace currentSpace = crypto.getActiveSpace();
+        bool hiddenProvisioned = crypto.isHiddenSpaceProvisioned();
+        
+        JsonDocument resp;
+        resp["hidden_space_enabled"] = hiddenProvisioned;
+        resp["current_space"] = (currentSpace == ActiveSpace::A ? "A" : 
+                                 currentSpace == ActiveSpace::B ? "B" : "NONE");
+        resp["can_enable"] = (currentSpace == ActiveSpace::A && !hiddenProvisioned);
+        resp["can_disable"] = hiddenProvisioned;
+        resp["share_wifi"] = crypto.isWifiSharedWithHiddenSpace();
+        
+        String out;
+        serializeJson(resp, out);
+        
+#ifdef SECURE_LAYER_ENABLED
+        WebServerSecureIntegration::sendSecureResponse(request, 200, "application/json", out, secureLayer);
+#else
+        request->send(200, "application/json", out);
+#endif
+    }, urlObfuscation);
+    
+    // POST /api/hidden_space - Enable or disable hidden space (URL OBFUSCATION)
+    URLObfuscationIntegration::registerDualEndpointWithBody(server, "/api/hidden_space", HTTP_POST,
+        [this](AsyncWebServerRequest *request){
+        // Empty handler, body handler does the work
+    }, [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
+        if (!isAuthenticated(request)) {
+            if (index == 0) request->send(401);
+            return;
+        }
+        if (!verifyCsrfToken(request)) {
+            if (index == 0) request->send(403);
+            return;
+        }
+        
+        static String body;
+        if (index == 0) body = "";
+        body.concat((char*)data, len);
+        
+        if (index + len >= total) {
+            String finalBody = body;
+            String clientId;
+            
+#ifdef SECURE_LAYER_ENABLED
+            // 🔐 Проверяем XOR зашифрованный запрос
+            clientId = WebServerSecureIntegration::getClientId(request);
+            if (clientId.length() > 0 && secureLayer.isSecureSessionValid(clientId) && 
+                (request->hasHeader("X-Secure-Request") || request->hasHeader("X-Security-Level"))) {
+                
+                LOG_INFO("WebServer", "🔐 HIDDEN_SPACE: Decrypting XOR request body for " + clientId.substring(0,8) + "...");
+                
+                String decryptedBody;
+                if (secureLayer.decryptRequest(clientId, body, decryptedBody)) {
+                    LOG_DEBUG("WebServer", "🔐 XOR decrypted hidden_space body length: " + String(decryptedBody.length()) + " bytes");
+                    finalBody = decryptedBody;
+                } else {
+                    LOG_ERROR("WebServer", "🔐 Failed to XOR decrypt hidden_space request body");
+                    request->send(400, "text/plain", "Hidden space XOR decryption failed");
+                    return;
+                }
+            }
+#endif
+            
+            JsonDocument doc;
+            if (deserializeJson(doc, finalBody) != DeserializationError::Ok) {
+                request->send(400, "text/plain", "Invalid JSON body.");
+                return;
+            }
+            
+            String action = doc["action"] | "";
+            
+            if (action.isEmpty()) {
+                request->send(400, "application/json", "{\"error\":\"Missing action\"}");
+                return;
+            }
+            
+            CryptoManager& crypto = CryptoManager::getInstance();
+            ActiveSpace currentSpace = crypto.getActiveSpace();
+            bool hiddenProvisioned = crypto.isHiddenSpaceProvisioned();
+            
+            if (action == "enable") {
+                // Enable hidden space - must be in Space A
+                if (currentSpace != ActiveSpace::A) {
+                    request->send(403, "application/json", "{\"error\":\"must_be_in_space_a\"}");
+                    return;
+                }
+                
+                if (hiddenProvisioned) {
+                    request->send(409, "application/json", "{\"error\":\"already_enabled\"}");
+                    return;
+                }
+                
+                // Create setup flag file
+                File flagFile = LittleFS.open("/.setup_hidden_space", "w");
+                if (!flagFile) {
+                    LOG_ERROR("WebServer", "Failed to create hidden space setup flag");
+                    request->send(500, "application/json", "{\"error\":\"failed_to_create_flag\"}");
+                    return;
+                }
+                flagFile.print("1");
+                flagFile.close();
+                
+                LOG_INFO("WebServer", "Hidden space setup flag created, rebooting...");
+                
+                JsonDocument resp;
+                resp["status"] = "rebooting";
+                String out;
+                serializeJson(resp, out);
+                
+#ifdef SECURE_LAYER_ENABLED
+                WebServerSecureIntegration::sendSecureResponse(request, 200, "application/json", out, secureLayer);
+#else
+                request->send(200, "application/json", out);
+#endif
+                
+                delay(500);
+                ESP.restart();
+                
+            } else if (action == "disable") {
+                // Disable/wipe hidden space
+                if (!hiddenProvisioned) {
+                    request->send(409, "application/json", "{\"error\":\"not_enabled\"}");
+                    return;
+                }
+                
+                if (currentSpace != ActiveSpace::A) {
+                    // Wipe only allowed from Space A
+                    LOG_INFO("WebServer", "Wipe attempt from Space B - denied");
+                    request->send(403, "application/json", 
+                        "{\"error\":\"must_wipe_from_space_a\",\"message\":\"Hidden space can only be disabled from Space A\"}");
+                    return;
+                }
+                
+                // Wipe from Space A - allowed
+                LOG_INFO("WebServer", "Disabling hidden space from Space A");
+                    
+                    if (!crypto.wipeHiddenSpace()) {
+                        LOG_ERROR("WebServer", "Failed to wipe hidden space");
+                        request->send(500, "application/json", "{\"error\":\"wipe_failed\"}");
+                        return;
+                    }
+                    
+                    JsonDocument resp;
+                    resp["status"] = "wiped_rebooting";
+                    String out;
+                    serializeJson(resp, out);
+                    
+#ifdef SECURE_LAYER_ENABLED
+                    WebServerSecureIntegration::sendSecureResponse(request, 200, "application/json", out, secureLayer);
+#else
+                    request->send(200, "application/json", out);
+#endif
+                    
+                    delay(500);
+                    ESP.restart();
+                
+            } else if (action == "set_share_wifi") {
+                // Set WiFi sharing with hidden space
+                if (currentSpace != ActiveSpace::A) {
+                    request->send(403, "application/json", "{\"error\":\"must_be_in_space_a\"}");
+                    return;
+                }
+                
+                if (!hiddenProvisioned) {
+                    request->send(409, "application/json", "{\"error\":\"hidden_space_not_enabled\"}");
+                    return;
+                }
+                
+                bool enabled = doc["enabled"] | false;
+                
+                if (enabled) {
+                    // Enable WiFi sharing - decrypt Space A wifi and re-encrypt with chip key
+                    String srcPath = "/wifi_config.json.enc";  // Space A path
+                    String cachePath = "/.conn_cache";
+                    
+                    if (!LittleFS.exists(srcPath)) {
+                        LOG_WARNING("WebServer", "No WiFi config found to share");
+                        request->send(404, "application/json", "{\"error\":\"no_wifi_config\"}");
+                        return;
+                    }
+                    
+                    // Read encrypted Space A wifi data
+                    File srcFile = LittleFS.open(srcPath, "r");
+                    if (!srcFile) {
+                        LOG_ERROR("WebServer", "Failed to open source WiFi config");
+                        request->send(500, "application/json", "{\"error\":\"failed_to_read_wifi\"}");
+                        return;
+                    }
+                    String encryptedSpaceA = srcFile.readString();
+                    srcFile.close();
+                    
+                    // Decrypt with Space A device key (current active key)
+                    String plainWifi = crypto.decrypt(encryptedSpaceA);
+                    if (plainWifi.isEmpty()) {
+                        LOG_ERROR("WebServer", "Failed to decrypt WiFi config");
+                        request->send(500, "application/json", "{\"error\":\"decrypt_failed\"}");
+                        return;
+                    }
+                    
+                    // Re-encrypt with chip-derived shared key
+                    String sharedEncrypted = crypto.encryptForSharedCache(plainWifi);
+                    plainWifi = "";  // wipe plaintext
+                    
+                    // Write to shared cache
+                    File cacheFile = LittleFS.open(cachePath, "w");
+                    if (!cacheFile) {
+                        LOG_ERROR("WebServer", "Failed to create shared WiFi cache");
+                        request->send(500, "application/json", "{\"error\":\"failed_to_create_cache\"}");
+                        return;
+                    }
+                    cacheFile.print(sharedEncrypted);
+                    cacheFile.close();
+                    
+                    LOG_INFO("WebServer", "WiFi config re-encrypted and saved to shared cache");
+                    
+                    // Set the flag
+                    if (!crypto.setShareWifiWithHiddenSpace(true)) {
+                        LOG_ERROR("WebServer", "Failed to set WiFi sharing flag");
+                        request->send(500, "application/json", "{\"error\":\"failed_to_set_flag\"}");
+                        return;
+                    }
+                    
+                    JsonDocument resp;
+                    resp["status"] = "wifi_shared";
+                    String out;
+                    serializeJson(resp, out);
+                    
+#ifdef SECURE_LAYER_ENABLED
+                    WebServerSecureIntegration::sendSecureResponse(request, 200, "application/json", out, secureLayer);
+#else
+                    request->send(200, "application/json", out);
+#endif
+                    
+                } else {
+                    // Disable WiFi sharing - remove shared cache
+                    String cachePath = "/.conn_cache";
+                    if (LittleFS.exists(cachePath)) {
+                        LittleFS.remove(cachePath);
+                        LOG_INFO("WebServer", "WiFi sharing disabled, shared cache removed");
+                    }
+                    
+                    // Clear the flag
+                    if (!crypto.setShareWifiWithHiddenSpace(false)) {
+                        LOG_ERROR("WebServer", "Failed to clear WiFi sharing flag");
+                        request->send(500, "application/json", "{\"error\":\"failed_to_clear_flag\"}");
+                        return;
+                    }
+                    
+                    JsonDocument resp;
+                    resp["status"] = "wifi_unshared";
+                    String out;
+                    serializeJson(resp, out);
+                    
+#ifdef SECURE_LAYER_ENABLED
+                    WebServerSecureIntegration::sendSecureResponse(request, 200, "application/json", out, secureLayer);
+#else
+                    request->send(200, "application/json", out);
+#endif
+                }
+                
+            } else {
+                request->send(400, "application/json", "{\"error\":\"invalid_action\"}");
+                return;
+            }
+        }
+    }, urlObfuscation);
 
     // Clock Settings endpoints
     server.on("/api/clock_settings", HTTP_GET, [this](AsyncWebServerRequest *request){
@@ -4542,6 +4961,21 @@ void WebServerManager::start() {
         if (!isAuthenticated(request)) return request->send(401);
         
         Theme currentTheme = configManager.loadTheme();
+        String _spacThemePath = CryptoManager::getInstance().getSpacePath("theme");
+        if (LittleFS.exists(_spacThemePath)) {
+            fs::File _tf = LittleFS.open(_spacThemePath, "r");
+            if (_tf) {
+                JsonDocument _tdoc;
+                if (deserializeJson(_tdoc, _tf) == DeserializationError::Ok) {
+                    String _saved = _tdoc["theme"] | "";
+                    if (_saved == "dark")  currentTheme = Theme::DARK;
+                    else if (_saved == "light") currentTheme = Theme::LIGHT;
+                }
+                _tf.close();
+            }
+        } else if (CryptoManager::getInstance().getActiveSpace() == ActiveSpace::B) {
+            currentTheme = Theme::DARK;  // Space B default — never inherit from Space A
+        }
         String themeName = (currentTheme == Theme::LIGHT) ? "light" : "dark";
         JsonDocument doc;
         doc["theme"] = themeName;
@@ -4629,7 +5063,21 @@ void WebServerManager::start() {
                 
                 // Применение темы
                 Theme newTheme = (theme == "light") ? Theme::LIGHT : Theme::DARK;
-                configManager.saveTheme(newTheme);
+                
+                // Save theme to per-space file
+                String themePath = CryptoManager::getInstance().getSpacePath("theme");
+                JsonDocument tdoc;
+                tdoc["theme"] = (newTheme == Theme::DARK) ? "dark" : "light";
+                fs::File tf = LittleFS.open(themePath, "w");
+                if (tf) {
+                    serializeJson(tdoc, tf);
+                    tf.close();
+                }
+                
+                // Keep global config.json in sync for Space A only
+                if (CryptoManager::getInstance().getActiveSpace() == ActiveSpace::A) {
+                    configManager.saveTheme(newTheme);
+                }
                 
                 extern bool pendingThemeChange; extern Theme pendingTheme;
                 pendingThemeChange = true; pendingTheme = newTheme;
@@ -4884,7 +5332,29 @@ void WebServerManager::start() {
     server.on("/api/startup_mode", HTTP_GET, [this](AsyncWebServerRequest *request){
         if (!isAuthenticated(request)) return request->send(401);
         
-        String mode = configManager.getStartupMode();
+        // Try per-space file first
+        String mode;
+        String startupPath = CryptoManager::getInstance().getSpacePath("startup_mode");
+        if (LittleFS.exists(startupPath)) {
+            fs::File sf = LittleFS.open(startupPath, "r");
+            if (sf) {
+                JsonDocument sdoc;
+                if (deserializeJson(sdoc, sf) == DeserializationError::Ok) {
+                    mode = sdoc["mode"] | "";
+                }
+                sf.close();
+            }
+        }
+        
+        // Fallback: Space A uses global config, Space B defaults to "passwords"
+        if (mode.length() == 0) {
+            if (CryptoManager::getInstance().getActiveSpace() == ActiveSpace::B) {
+                mode = "passwords";  // Space B default
+            } else {
+                mode = configManager.getStartupMode();  // Space A uses global config
+            }
+        }
+        
         JsonDocument doc;
         doc["mode"] = mode;
         String response;
@@ -4963,8 +5433,23 @@ void WebServerManager::start() {
                     return request->send(400, "text/plain", "Invalid startup mode. Must be 'totp' or 'password'.");
                 }
                 
-                // Сохранение
-                bool success = configManager.saveStartupMode(mode);
+                // Save to per-space file
+                String startupPath = CryptoManager::getInstance().getSpacePath("startup_mode");
+                JsonDocument sdoc;
+                sdoc["mode"] = mode;
+                fs::File sf = LittleFS.open(startupPath, "w");
+                bool success = false;
+                if (sf) {
+                    serializeJson(sdoc, sf);
+                    sf.close();
+                    success = true;
+                }
+                
+                // Keep global config in sync only for Space A
+                if (CryptoManager::getInstance().getActiveSpace() == ActiveSpace::A) {
+                    configManager.saveStartupMode(mode);
+                }
+                
                 String message;
                 int statusCode;
                 
@@ -5727,7 +6212,8 @@ void WebServerManager::start() {
                         obj["password"] = entry.password;  // Только name и password в PasswordEntry
                         obj["strength"] = entry.strength;
                         obj["pw_hash"] = entry.pw_hash;
-                        obj["category"] = entry.category;
+                        obj["category"]  = entry.category;
+                        obj["auto_send"] = entry.auto_send;
                     }
                     String output;
                     serializeJson(doc, output);
@@ -5768,7 +6254,8 @@ void WebServerManager::start() {
                         obj["password"] = entry.password;  // Только name и password в PasswordEntry
                         obj["strength"] = entry.strength;
                         obj["pw_hash"] = entry.pw_hash;
-                        obj["category"] = entry.category;
+                        obj["category"]  = entry.category;
+                        obj["auto_send"] = entry.auto_send;
                     }
                     String plaintext;
                     serializeJson(doc, plaintext);
@@ -5843,10 +6330,12 @@ void WebServerManager::start() {
                     String name = targetData["name"].as<String>();
                     String password = targetData["password"].as<String>();
                     String category = targetData["category"] | "";
+                    JsonVariant _as = targetData["auto_send"];
+                    bool autoSend = (!_as.isNull() && (_as.as<bool>() || _as.as<String>() == "1" || _as.as<String>() == "true"));
                     
                     LOG_INFO("WebServer", "🚇 TUNNELED Password add: " + name);
                     
-                    if (passwordManager.addPassword(name, password, category)) {
+                    if (passwordManager.addPassword(name, password, category, autoSend)) {
                         LOG_INFO("WebServer", "🔐 Password added: " + name);
                         
                         JsonDocument responseDoc;
@@ -5922,6 +6411,7 @@ void WebServerManager::start() {
                         responseDoc["name"] = pwd.name;
                         responseDoc["password"] = pwd.password;
                         responseDoc["category"] = pwd.category;
+                        responseDoc["auto_send"] = pwd.auto_send;
                         String jsonResponse;
                         serializeJson(responseDoc, jsonResponse);
                         
@@ -5950,10 +6440,12 @@ void WebServerManager::start() {
                     String name = targetData["name"].as<String>();
                     String password = targetData["password"].as<String>();
                     String category = targetData["category"] | "";
+                    JsonVariant _as = targetData["auto_send"];
+                    bool autoSend = (!_as.isNull() && (_as.as<bool>() || _as.as<String>() == "1" || _as.as<String>() == "true"));
                     
                     LOG_INFO("WebServer", "🚇 TUNNELED Password update: index " + String(index) + ", name: " + name);
                     
-                    if (passwordManager.updatePassword(index, name, password, category)) {
+                    if (passwordManager.updatePassword(index, name, password, category, autoSend)) {
                         LOG_INFO("WebServer", "🔐 Password updated at index: " + String(index));
                         
                         JsonDocument responseDoc;
@@ -6023,6 +6515,21 @@ void WebServerManager::start() {
                     }
                     
                     Theme currentTheme = configManager.loadTheme();
+                    String _spacThemePath = CryptoManager::getInstance().getSpacePath("theme");
+                    if (LittleFS.exists(_spacThemePath)) {
+                        fs::File _tf = LittleFS.open(_spacThemePath, "r");
+                        if (_tf) {
+                            JsonDocument _tdoc;
+                            if (deserializeJson(_tdoc, _tf) == DeserializationError::Ok) {
+                                String _saved = _tdoc["theme"] | "";
+                                if (_saved == "dark")  currentTheme = Theme::DARK;
+                                else if (_saved == "light") currentTheme = Theme::LIGHT;
+                            }
+                            _tf.close();
+                        }
+                    } else if (CryptoManager::getInstance().getActiveSpace() == ActiveSpace::B) {
+                        currentTheme = Theme::DARK;  // Space B default — never inherit from Space A
+                    }
                     String themeName = (currentTheme == Theme::LIGHT) ? "light" : "dark";
                     JsonDocument doc;
                     doc["theme"] = themeName;
@@ -6064,7 +6571,21 @@ void WebServerManager::start() {
                     }
                     
                     Theme newTheme = (theme == "light") ? Theme::LIGHT : Theme::DARK;
-                    configManager.saveTheme(newTheme);
+                    
+                    // Save theme to per-space file
+                    String themePath = CryptoManager::getInstance().getSpacePath("theme");
+                    JsonDocument tdoc;
+                    tdoc["theme"] = (newTheme == Theme::DARK) ? "dark" : "light";
+                    fs::File tf = LittleFS.open(themePath, "w");
+                    if (tf) {
+                        serializeJson(tdoc, tf);
+                        tf.close();
+                    }
+                    
+                    // Keep global config.json in sync for Space A only
+                    if (CryptoManager::getInstance().getActiveSpace() == ActiveSpace::A) {
+                        configManager.saveTheme(newTheme);
+                    }
                     
                     extern bool pendingThemeChange; extern Theme pendingTheme;
                     pendingThemeChange = true; pendingTheme = newTheme;
@@ -6181,7 +6702,25 @@ void WebServerManager::start() {
                 
                 // 🎯 МАРШРУТИЗАЦИЯ: /api/boot-mode GET
                 if (targetEndpoint == "/api/boot-mode" && targetMethod == "GET") {
-                    String mode = configManager.getBootMode();
+                    // Try per-space file first
+                    String mode;
+                    String bootPath = CryptoManager::getInstance().getSpacePath("boot_mode");
+                    if (LittleFS.exists(bootPath)) {
+                        fs::File bf = LittleFS.open(bootPath, "r");
+                        if (bf) {
+                            JsonDocument bdoc;
+                            if (deserializeJson(bdoc, bf) == DeserializationError::Ok) {
+                                mode = bdoc["mode"] | "";
+                            }
+                            bf.close();
+                        }
+                    }
+                    
+                    // Fallback: use global config for both spaces
+                    if (mode.length() == 0) {
+                        mode = configManager.getBootMode();
+                    }
+                    
                     JsonDocument resp;
                     resp["boot_mode"] = mode;
                     String out; serializeJson(resp, out);
@@ -6196,7 +6735,24 @@ void WebServerManager::start() {
                         WebServerSecureIntegration::sendSecureResponse(request, 400, "application/json", "{\"error\":\"Invalid boot_mode\"}", secureLayer);
                         return;
                     }
-                    bool ok = configManager.saveBootMode(mode);
+                    
+                    // Save to per-space file
+                    String bootPath = CryptoManager::getInstance().getSpacePath("boot_mode");
+                    JsonDocument bdoc;
+                    bdoc["mode"] = mode;
+                    fs::File bf = LittleFS.open(bootPath, "w");
+                    bool ok = false;
+                    if (bf) {
+                        serializeJson(bdoc, bf);
+                        bf.close();
+                        ok = true;
+                    }
+                    
+                    // Keep global config in sync only for Space A
+                    if (CryptoManager::getInstance().getActiveSpace() == ActiveSpace::A) {
+                        configManager.saveBootMode(mode);
+                    }
+                    
                     JsonDocument resp;
                     resp["success"] = ok;
                     resp["boot_mode"] = mode;
@@ -6208,7 +6764,25 @@ void WebServerManager::start() {
 #ifdef BOARD_HAS_USB_HID
                 // 🎯 МАРШРУТИЗАЦИЯ: /api/hid-mode GET
                 if (targetEndpoint == "/api/hid-mode" && targetMethod == "GET") {
-                    String mode = configManager.getDefaultHidMode();
+                    // Try per-space file first
+                    String mode;
+                    String hidPath = CryptoManager::getInstance().getSpacePath("hid_mode");
+                    if (LittleFS.exists(hidPath)) {
+                        fs::File hf = LittleFS.open(hidPath, "r");
+                        if (hf) {
+                            JsonDocument hdoc;
+                            if (deserializeJson(hdoc, hf) == DeserializationError::Ok) {
+                                mode = hdoc["mode"] | "";
+                            }
+                            hf.close();
+                        }
+                    }
+                    
+                    // Fallback: use global config for both spaces
+                    if (mode.length() == 0) {
+                        mode = configManager.getDefaultHidMode();
+                    }
+                    
                     JsonDocument resp;
                     resp["hid_mode"] = mode;
                     String out; serializeJson(resp, out);
@@ -6223,7 +6797,24 @@ void WebServerManager::start() {
                         WebServerSecureIntegration::sendSecureResponse(request, 400, "application/json", "{\"error\":\"Invalid hid_mode\"}", secureLayer);
                         return;
                     }
-                    bool ok = configManager.saveDefaultHidMode(mode);
+                    
+                    // Save to per-space file
+                    String hidPath = CryptoManager::getInstance().getSpacePath("hid_mode");
+                    JsonDocument hdoc;
+                    hdoc["mode"] = mode;
+                    fs::File hf = LittleFS.open(hidPath, "w");
+                    bool ok = false;
+                    if (hf) {
+                        serializeJson(hdoc, hf);
+                        hf.close();
+                        ok = true;
+                    }
+                    
+                    // Keep global config in sync only for Space A
+                    if (CryptoManager::getInstance().getActiveSpace() == ActiveSpace::A) {
+                        configManager.saveDefaultHidMode(mode);
+                    }
+                    
                     JsonDocument resp;
                     resp["success"] = ok;
                     resp["hid_mode"] = mode;
@@ -6561,6 +7152,10 @@ void WebServerManager::start() {
                                 LittleFS.remove("/device_ble_pin.json.enc");
                                 LittleFS.remove("/duress_pin.hash");
                                 LittleFS.remove("/session.json.enc");
+                                LittleFS.remove("/.net_prefs");
+                                LittleFS.remove("/.conn_cache");
+                                LittleFS.remove("/theme_pref.json");
+                                LittleFS.remove("/startup_pref.json");
                                 
                                 // URL Obfuscation: Удаление boot counter и всех mappings
                                 LOG_INFO("WebServer", "🚇 TUNNELED: Clearing URL obfuscation data...");
@@ -6583,6 +7178,17 @@ void WebServerManager::start() {
                                 // Очистка NVS partition (BLE bonding keys)
                                 LOG_INFO("WebServer", "🚇 TUNNELED: Clearing NVS partition...");
                                 nvs_flash_erase_partition("nvs");
+                                
+                                // ═══ FORMAT LITTLEFS TO REMOVE ALL FILES INCLUDING SPACE B ═══
+                                LOG_INFO("WebServer", "🚇 TUNNELED: Formatting LittleFS to ensure complete wipe...");
+                                LittleFS.end();
+                                LittleFS.format();
+                                LittleFS.begin(false);
+                                LOG_INFO("WebServer", "🚇 TUNNELED: LittleFS formatted - all files removed");
+                                
+                                // ═══ SECURE MEMORY ZEROING ═══
+                                LOG_INFO("WebServer", "🚇 TUNNELED: Wiping device key from memory...");
+                                CryptoManager::getInstance().wipeDeviceKey();
                                 
                                 LOG_INFO("WebServer", "🚇 TUNNELED: All data files deleted for factory reset");
                                 
@@ -6642,6 +7248,239 @@ void WebServerManager::start() {
                     LOG_INFO("WebServer", "🔐 PINCODE_SETTINGS POST ENCRYPTION: Securing tunneled response [TUNNELED]");
                     WebServerSecureIntegration::sendSecureResponse(request, statusCode, "application/json", response, secureLayer);
                     return;
+                }
+                
+                // 🎯 МАРШРУТИЗАЦИЯ: /api/hidden_space GET
+                if (targetEndpoint == "/api/hidden_space" && targetMethod == "GET") {
+                    if (request->hasHeader("X-User-Activity")) {
+                        resetActivityTimer();
+                    }
+                    
+                    CryptoManager& crypto = CryptoManager::getInstance();
+                    ActiveSpace currentSpace = crypto.getActiveSpace();
+                    bool hiddenProvisioned = crypto.isHiddenSpaceProvisioned();
+                    
+                    JsonDocument resp;
+                    resp["hidden_space_enabled"] = hiddenProvisioned;
+                    resp["current_space"] = (currentSpace == ActiveSpace::A ? "A" : 
+                                             currentSpace == ActiveSpace::B ? "B" : "NONE");
+                    resp["can_enable"] = (currentSpace == ActiveSpace::A && !hiddenProvisioned);
+                    resp["can_disable"] = hiddenProvisioned;
+                    resp["share_wifi"] = crypto.isWifiSharedWithHiddenSpace();
+                    
+                    String out;
+                    serializeJson(resp, out);
+                    
+                    LOG_INFO("WebServer", "🚇 TUNNELED hidden_space GET");
+                    LOG_INFO("WebServer", "🔐 HIDDEN_SPACE GET ENCRYPTION: Securing tunneled response [TUNNELED]");
+                    WebServerSecureIntegration::sendSecureResponse(request, 200, "application/json", out, secureLayer);
+                    return;
+                }
+                
+                // 🎯 МАРШРУТИЗАЦИЯ: /api/hidden_space POST
+                if (targetEndpoint == "/api/hidden_space" && targetMethod == "POST") {
+                    if (request->hasHeader("X-User-Activity")) {
+                        resetActivityTimer();
+                    }
+                    
+                    String action = targetData["action"].as<String>();
+                    
+                    if (action.isEmpty()) {
+                        String errorResp = "{\"error\":\"Missing action\"}";
+                        WebServerSecureIntegration::sendSecureResponse(request, 400, "application/json", errorResp, secureLayer);
+                        return;
+                    }
+                    
+                    CryptoManager& crypto = CryptoManager::getInstance();
+                    ActiveSpace currentSpace = crypto.getActiveSpace();
+                    bool hiddenProvisioned = crypto.isHiddenSpaceProvisioned();
+                    
+                    if (action == "enable") {
+                        // Enable hidden space - must be in Space A
+                        if (currentSpace != ActiveSpace::A) {
+                            String errorResp = "{\"error\":\"must_be_in_space_a\"}";
+                            WebServerSecureIntegration::sendSecureResponse(request, 403, "application/json", errorResp, secureLayer);
+                            return;
+                        }
+                        
+                        if (hiddenProvisioned) {
+                            String errorResp = "{\"error\":\"already_enabled\"}";
+                            WebServerSecureIntegration::sendSecureResponse(request, 409, "application/json", errorResp, secureLayer);
+                            return;
+                        }
+                        
+                        // Create setup flag file
+                        File flagFile = LittleFS.open("/.setup_hidden_space", "w");
+                        if (!flagFile) {
+                            LOG_ERROR("WebServer", "🚇 TUNNELED: Failed to create hidden space setup flag");
+                            String errorResp = "{\"error\":\"failed_to_create_flag\"}";
+                            WebServerSecureIntegration::sendSecureResponse(request, 500, "application/json", errorResp, secureLayer);
+                            return;
+                        }
+                        flagFile.print("1");
+                        flagFile.close();
+                        
+                        LOG_INFO("WebServer", "🚇 TUNNELED: Hidden space setup flag created, rebooting...");
+                        
+                        JsonDocument resp;
+                        resp["status"] = "rebooting";
+                        String out;
+                        serializeJson(resp, out);
+                        
+                        WebServerSecureIntegration::sendSecureResponse(request, 200, "application/json", out, secureLayer);
+                        
+                        delay(500);
+                        ESP.restart();
+                        return;
+                        
+                    } else if (action == "disable") {
+                        // Disable/wipe hidden space
+                        if (!hiddenProvisioned) {
+                            String errorResp = "{\"error\":\"not_enabled\"}";
+                            WebServerSecureIntegration::sendSecureResponse(request, 409, "application/json", errorResp, secureLayer);
+                            return;
+                        }
+                        
+                        if (currentSpace != ActiveSpace::A) {
+                            // Wipe only allowed from Space A
+                            LOG_INFO("WebServer", "🚇 TUNNELED: Wipe attempt from Space B - denied");
+                            String errorResp = "{\"error\":\"must_wipe_from_space_a\",\"message\":\"Hidden space can only be disabled from Space A\"}";
+                            WebServerSecureIntegration::sendSecureResponse(request, 403, "application/json", errorResp, secureLayer);
+                            return;
+                        }
+                        
+                        // Wipe from Space A - allowed
+                        LOG_INFO("WebServer", "🚇 TUNNELED: Disabling hidden space from Space A");
+                            
+                            if (!crypto.wipeHiddenSpace()) {
+                                LOG_ERROR("WebServer", "🚇 TUNNELED: Failed to wipe hidden space");
+                                String errorResp = "{\"error\":\"wipe_failed\"}";
+                                WebServerSecureIntegration::sendSecureResponse(request, 500, "application/json", errorResp, secureLayer);
+                                return;
+                            }
+                            
+                            JsonDocument resp;
+                            resp["status"] = "wiped_rebooting";
+                            String out;
+                            serializeJson(resp, out);
+                            
+                            WebServerSecureIntegration::sendSecureResponse(request, 200, "application/json", out, secureLayer);
+                            
+                            delay(500);
+                            ESP.restart();
+                            return;
+                        
+                    } else if (action == "set_share_wifi") {
+                        // Set WiFi sharing with hidden space
+                        if (currentSpace != ActiveSpace::A) {
+                            String errorResp = "{\"error\":\"must_be_in_space_a\"}";
+                            WebServerSecureIntegration::sendSecureResponse(request, 403, "application/json", errorResp, secureLayer);
+                            return;
+                        }
+                        
+                        if (!hiddenProvisioned) {
+                            String errorResp = "{\"error\":\"hidden_space_not_enabled\"}";
+                            WebServerSecureIntegration::sendSecureResponse(request, 409, "application/json", errorResp, secureLayer);
+                            return;
+                        }
+                        
+                        bool enabled = targetData["enabled"] | false;
+                        
+                        if (enabled) {
+                            // Enable WiFi sharing - decrypt Space A wifi and re-encrypt with chip key
+                            String srcPath = "/wifi_config.json.enc";  // Space A path
+                            String cachePath = "/.conn_cache";
+                            
+                            if (!LittleFS.exists(srcPath)) {
+                                LOG_WARNING("WebServer", "🚇 TUNNELED: No WiFi config found to share");
+                                String errorResp = "{\"error\":\"no_wifi_config\"}";
+                                WebServerSecureIntegration::sendSecureResponse(request, 404, "application/json", errorResp, secureLayer);
+                                return;
+                            }
+                            
+                            // Read encrypted Space A wifi data
+                            File srcFile = LittleFS.open(srcPath, "r");
+                            if (!srcFile) {
+                                LOG_ERROR("WebServer", "🚇 TUNNELED: Failed to open source WiFi config");
+                                String errorResp = "{\"error\":\"failed_to_read_wifi\"}";
+                                WebServerSecureIntegration::sendSecureResponse(request, 500, "application/json", errorResp, secureLayer);
+                                return;
+                            }
+                            String encryptedSpaceA = srcFile.readString();
+                            srcFile.close();
+                            
+                            // Decrypt with Space A device key (current active key)
+                            String plainWifi = crypto.decrypt(encryptedSpaceA);
+                            if (plainWifi.isEmpty()) {
+                                LOG_ERROR("WebServer", "🚇 TUNNELED: Failed to decrypt WiFi config");
+                                String errorResp = "{\"error\":\"decrypt_failed\"}";
+                                WebServerSecureIntegration::sendSecureResponse(request, 500, "application/json", errorResp, secureLayer);
+                                return;
+                            }
+                            
+                            // Re-encrypt with chip-derived shared key
+                            String sharedEncrypted = crypto.encryptForSharedCache(plainWifi);
+                            plainWifi = "";  // wipe plaintext
+                            
+                            // Write to shared cache
+                            File cacheFile = LittleFS.open(cachePath, "w");
+                            if (!cacheFile) {
+                                LOG_ERROR("WebServer", "🚇 TUNNELED: Failed to create shared WiFi cache");
+                                String errorResp = "{\"error\":\"failed_to_create_cache\"}";
+                                WebServerSecureIntegration::sendSecureResponse(request, 500, "application/json", errorResp, secureLayer);
+                                return;
+                            }
+                            cacheFile.print(sharedEncrypted);
+                            cacheFile.close();
+                            
+                            LOG_INFO("WebServer", "🚇 TUNNELED: WiFi config re-encrypted and saved to shared cache");
+                            
+                            // Set the flag
+                            if (!crypto.setShareWifiWithHiddenSpace(true)) {
+                                LOG_ERROR("WebServer", "🚇 TUNNELED: Failed to set WiFi sharing flag");
+                                String errorResp = "{\"error\":\"failed_to_set_flag\"}";
+                                WebServerSecureIntegration::sendSecureResponse(request, 500, "application/json", errorResp, secureLayer);
+                                return;
+                            }
+                            
+                            JsonDocument resp;
+                            resp["status"] = "wifi_shared";
+                            String out;
+                            serializeJson(resp, out);
+                            
+                            WebServerSecureIntegration::sendSecureResponse(request, 200, "application/json", out, secureLayer);
+                            return;
+                            
+                        } else {
+                            // Disable WiFi sharing - remove shared cache
+                            String cachePath = "/.conn_cache";
+                            if (LittleFS.exists(cachePath)) {
+                                LittleFS.remove(cachePath);
+                                LOG_INFO("WebServer", "🚇 TUNNELED: WiFi sharing disabled, shared cache removed");
+                            }
+                            
+                            // Clear the flag
+                            if (!crypto.setShareWifiWithHiddenSpace(false)) {
+                                LOG_ERROR("WebServer", "🚇 TUNNELED: Failed to clear WiFi sharing flag");
+                                String errorResp = "{\"error\":\"failed_to_clear_flag\"}";
+                                WebServerSecureIntegration::sendSecureResponse(request, 500, "application/json", errorResp, secureLayer);
+                                return;
+                            }
+                            
+                            JsonDocument resp;
+                            resp["status"] = "wifi_unshared";
+                            String out;
+                            serializeJson(resp, out);
+                            
+                            WebServerSecureIntegration::sendSecureResponse(request, 200, "application/json", out, secureLayer);
+                            return;
+                        }
+                        
+                    } else {
+                        String errorResp = "{\"error\":\"invalid_action\"}";
+                        WebServerSecureIntegration::sendSecureResponse(request, 400, "application/json", errorResp, secureLayer);
+                        return;
+                    }
                 }
                 
                 // 🎯 МАРШРУТИЗАЦИЯ: /api/ble_pin_update POST
@@ -6795,7 +7634,29 @@ void WebServerManager::start() {
                 
                 // 🎯 МАРШРУТИЗАЦИЯ: /api/startup_mode GET
                 if (targetEndpoint == "/api/startup_mode" && targetMethod == "GET") {
-                    String mode = configManager.getStartupMode();
+                    // Try per-space file first
+                    String mode;
+                    String startupPath = CryptoManager::getInstance().getSpacePath("startup_mode");
+                    if (LittleFS.exists(startupPath)) {
+                        fs::File sf = LittleFS.open(startupPath, "r");
+                        if (sf) {
+                            JsonDocument sdoc;
+                            if (deserializeJson(sdoc, sf) == DeserializationError::Ok) {
+                                mode = sdoc["mode"] | "";
+                            }
+                            sf.close();
+                        }
+                    }
+                    
+                    // Fallback: Space A uses global config, Space B defaults to "passwords"
+                    if (mode.length() == 0) {
+                        if (CryptoManager::getInstance().getActiveSpace() == ActiveSpace::B) {
+                            mode = "passwords";  // Space B default
+                        } else {
+                            mode = configManager.getStartupMode();  // Space A uses global config
+                        }
+                    }
+                    
                     String output;
                     output.reserve(30 + mode.length());
                     output = "{\"mode\":\"";
@@ -6817,7 +7678,23 @@ void WebServerManager::start() {
                         return request->send(400, "text/plain", "Invalid startup mode. Must be 'totp' or 'password'.");
                     }
                     
-                    bool success = configManager.saveStartupMode(mode);
+                    // Save to per-space file
+                    String startupPath = CryptoManager::getInstance().getSpacePath("startup_mode");
+                    JsonDocument sdoc;
+                    sdoc["mode"] = mode;
+                    fs::File sf = LittleFS.open(startupPath, "w");
+                    bool success = false;
+                    if (sf) {
+                        serializeJson(sdoc, sf);
+                        sf.close();
+                        success = true;
+                    }
+                    
+                    // Keep global config in sync only for Space A
+                    if (CryptoManager::getInstance().getActiveSpace() == ActiveSpace::A) {
+                        configManager.saveStartupMode(mode);
+                    }
+                    
                     String message = success ? "Startup mode saved successfully!" : "Failed to save startup mode.";
                     String output;
                     output.reserve(50 + message.length());
@@ -7624,6 +8501,21 @@ void WebServerManager::start() {
                     if (targetEndpoint == "/api/theme" && targetMethod == "GET") {
                         if (request->hasHeader("X-User-Activity")) resetActivityTimer();
                         Theme currentTheme = configManager.loadTheme();
+                        String _spacThemePath = CryptoManager::getInstance().getSpacePath("theme");
+                        if (LittleFS.exists(_spacThemePath)) {
+                            fs::File _tf = LittleFS.open(_spacThemePath, "r");
+                            if (_tf) {
+                                JsonDocument _tdoc;
+                                if (deserializeJson(_tdoc, _tf) == DeserializationError::Ok) {
+                                    String _saved = _tdoc["theme"] | "";
+                                    if (_saved == "dark")  currentTheme = Theme::DARK;
+                                    else if (_saved == "light") currentTheme = Theme::LIGHT;
+                                }
+                                _tf.close();
+                            }
+                        } else if (CryptoManager::getInstance().getActiveSpace() == ActiveSpace::B) {
+                            currentTheme = Theme::DARK;  // Space B default — never inherit from Space A
+                        }
                         String output;
                         output.reserve(20);
                         output = "{\"theme\":";
@@ -7656,7 +8548,29 @@ void WebServerManager::start() {
                     
                     // /api/startup_mode GET
                     if (targetEndpoint == "/api/startup_mode" && targetMethod == "GET") {
-                        String mode = configManager.getStartupMode();
+                        // Try per-space file first
+                        String mode;
+                        String startupPath = CryptoManager::getInstance().getSpacePath("startup_mode");
+                        if (LittleFS.exists(startupPath)) {
+                            fs::File sf = LittleFS.open(startupPath, "r");
+                            if (sf) {
+                                JsonDocument sdoc;
+                                if (deserializeJson(sdoc, sf) == DeserializationError::Ok) {
+                                    mode = sdoc["mode"] | "";
+                                }
+                                sf.close();
+                            }
+                        }
+                        
+                        // Fallback: Space A uses global config, Space B defaults to "passwords"
+                        if (mode.length() == 0) {
+                            if (CryptoManager::getInstance().getActiveSpace() == ActiveSpace::B) {
+                                mode = "passwords";  // Space B default
+                            } else {
+                                mode = configManager.getStartupMode();  // Space A uses global config
+                            }
+                        }
+                        
                         String output;
                         output.reserve(30 + mode.length());
                         output = "{\"mode\":\"";
@@ -7773,7 +8687,24 @@ void WebServerManager::start() {
                             if (bufferPtr) { delete bufferPtr; request->_tempObject = nullptr; }
                             return request->send(400, "text/plain", "Invalid startup mode. Must be 'totp' or 'password'.");
                         }
-                        bool success = configManager.saveStartupMode(mode);
+                        
+                        // Save to per-space file
+                        String startupPath = CryptoManager::getInstance().getSpacePath("startup_mode");
+                        JsonDocument sdoc;
+                        sdoc["mode"] = mode;
+                        fs::File sf = LittleFS.open(startupPath, "w");
+                        bool success = false;
+                        if (sf) {
+                            serializeJson(sdoc, sf);
+                            sf.close();
+                            success = true;
+                        }
+                        
+                        // Keep global config in sync only for Space A
+                        if (CryptoManager::getInstance().getActiveSpace() == ActiveSpace::A) {
+                            configManager.saveStartupMode(mode);
+                        }
+                        
                         String message = success ? "Startup mode saved successfully!" : "Failed to save startup mode.";
                         String output;
                         output.reserve(50 + message.length());
@@ -7837,7 +8768,21 @@ void WebServerManager::start() {
                         }
                         
                         Theme newTheme = (theme == "light") ? Theme::LIGHT : Theme::DARK;
-                        configManager.saveTheme(newTheme);
+                        
+                        // Save theme to per-space file
+                        String themePath = CryptoManager::getInstance().getSpacePath("theme");
+                        JsonDocument tdoc;
+                        tdoc["theme"] = (newTheme == Theme::DARK) ? "dark" : "light";
+                        fs::File tf = LittleFS.open(themePath, "w");
+                        if (tf) {
+                            serializeJson(tdoc, tf);
+                            tf.close();
+                        }
+                        
+                        // Keep global config.json in sync for Space A only
+                        if (CryptoManager::getInstance().getActiveSpace() == ActiveSpace::A) {
+                            configManager.saveTheme(newTheme);
+                        }
                         
                         extern bool pendingThemeChange; extern Theme pendingTheme;
                         pendingThemeChange = true; pendingTheme = newTheme;
@@ -8030,7 +8975,25 @@ void WebServerManager::start() {
                     
                     // /api/boot-mode GET
                     if (targetEndpoint == "/api/boot-mode" && targetMethod == "GET") {
-                        String mode = configManager.getBootMode();
+                        // Try per-space file first
+                        String mode;
+                        String bootPath = CryptoManager::getInstance().getSpacePath("boot_mode");
+                        if (LittleFS.exists(bootPath)) {
+                            fs::File bf = LittleFS.open(bootPath, "r");
+                            if (bf) {
+                                JsonDocument bdoc;
+                                if (deserializeJson(bdoc, bf) == DeserializationError::Ok) {
+                                    mode = bdoc["mode"] | "";
+                                }
+                                bf.close();
+                            }
+                        }
+                        
+                        // Fallback: use global config for both spaces
+                        if (mode.length() == 0) {
+                            mode = configManager.getBootMode();
+                        }
+                        
                         JsonDocument resp;
                         resp["boot_mode"] = mode;
                         String out; serializeJson(resp, out);
@@ -8047,7 +9010,24 @@ void WebServerManager::start() {
                             if (bufferPtr) { delete bufferPtr; request->_tempObject = nullptr; }
                             return;
                         }
-                        bool ok = configManager.saveBootMode(mode);
+                        
+                        // Save to per-space file
+                        String bootPath = CryptoManager::getInstance().getSpacePath("boot_mode");
+                        JsonDocument bdoc;
+                        bdoc["mode"] = mode;
+                        fs::File bf = LittleFS.open(bootPath, "w");
+                        bool ok = false;
+                        if (bf) {
+                            serializeJson(bdoc, bf);
+                            bf.close();
+                            ok = true;
+                        }
+                        
+                        // Keep global config in sync only for Space A
+                        if (CryptoManager::getInstance().getActiveSpace() == ActiveSpace::A) {
+                            configManager.saveBootMode(mode);
+                        }
+                        
                         JsonDocument resp;
                         resp["success"] = ok;
                         resp["boot_mode"] = mode;
@@ -8060,7 +9040,25 @@ void WebServerManager::start() {
 #ifdef BOARD_HAS_USB_HID
                     // /api/hid-mode GET
                     if (targetEndpoint == "/api/hid-mode" && targetMethod == "GET") {
-                        String mode = configManager.getDefaultHidMode();
+                        // Try per-space file first
+                        String mode;
+                        String hidPath = CryptoManager::getInstance().getSpacePath("hid_mode");
+                        if (LittleFS.exists(hidPath)) {
+                            fs::File hf = LittleFS.open(hidPath, "r");
+                            if (hf) {
+                                JsonDocument hdoc;
+                                if (deserializeJson(hdoc, hf) == DeserializationError::Ok) {
+                                    mode = hdoc["mode"] | "";
+                                }
+                                hf.close();
+                            }
+                        }
+                        
+                        // Fallback: use global config for both spaces
+                        if (mode.length() == 0) {
+                            mode = configManager.getDefaultHidMode();
+                        }
+                        
                         JsonDocument resp;
                         resp["hid_mode"] = mode;
                         String out; serializeJson(resp, out);
@@ -8077,7 +9075,24 @@ void WebServerManager::start() {
                             if (bufferPtr) { delete bufferPtr; request->_tempObject = nullptr; }
                             return;
                         }
-                        bool ok = configManager.saveDefaultHidMode(mode);
+                        
+                        // Save to per-space file
+                        String hidPath = CryptoManager::getInstance().getSpacePath("hid_mode");
+                        JsonDocument hdoc;
+                        hdoc["mode"] = mode;
+                        fs::File hf = LittleFS.open(hidPath, "w");
+                        bool ok = false;
+                        if (hf) {
+                            serializeJson(hdoc, hf);
+                            hf.close();
+                            ok = true;
+                        }
+                        
+                        // Keep global config in sync only for Space A
+                        if (CryptoManager::getInstance().getActiveSpace() == ActiveSpace::A) {
+                            configManager.saveDefaultHidMode(mode);
+                        }
+                        
                         JsonDocument resp;
                         resp["success"] = ok;
                         resp["hid_mode"] = mode;
@@ -8431,6 +9446,10 @@ void WebServerManager::start() {
                                         LittleFS.remove("/device_ble_pin.json.enc");
                                         LittleFS.remove("/duress_pin.hash");
                                         LittleFS.remove("/session.json.enc");
+                                        LittleFS.remove("/.net_prefs");
+                                        LittleFS.remove("/.conn_cache");
+                                        LittleFS.remove("/theme_pref.json");
+                                        LittleFS.remove("/startup_pref.json");
                                         
                                         // URL Obfuscation: Удаление boot counter и всех mappings
                                         LOG_INFO("WebServer", "🔗 Obfuscated: Clearing URL obfuscation data...");
@@ -8453,6 +9472,17 @@ void WebServerManager::start() {
                                         // Очистка NVS partition (BLE bonding keys)
                                         LOG_INFO("WebServer", "🔗 Obfuscated: Clearing NVS partition...");
                                         nvs_flash_erase_partition("nvs");
+                                        
+                                        // ═══ FORMAT LITTLEFS TO REMOVE ALL FILES INCLUDING SPACE B ═══
+                                        LOG_INFO("WebServer", "🔗 Obfuscated: Formatting LittleFS to ensure complete wipe...");
+                                        LittleFS.end();
+                                        LittleFS.format();
+                                        LittleFS.begin(false);
+                                        LOG_INFO("WebServer", "🔗 Obfuscated: LittleFS formatted - all files removed");
+                                        
+                                        // ═══ SECURE MEMORY ZEROING ═══
+                                        LOG_INFO("WebServer", "🔗 Obfuscated: Wiping device key from memory...");
+                                        CryptoManager::getInstance().wipeDeviceKey();
                                         
                                         LOG_INFO("WebServer", "🔗 Obfuscated: All data files deleted for factory reset");
                                         
@@ -8765,7 +9795,8 @@ void WebServerManager::start() {
                             obj["password"] = entry.password;
                             obj["strength"] = entry.strength;
                             obj["pw_hash"] = entry.pw_hash;
-                            obj["category"] = entry.category;
+                            obj["category"]  = entry.category;
+                            obj["auto_send"] = entry.auto_send;
                         }
                         String output;
                         serializeJson(doc, output);
@@ -8785,10 +9816,14 @@ void WebServerManager::start() {
                         String name = targetData["name"].as<String>();
                         String password = targetData["password"].as<String>();
                         String category = targetData["category"] | "";
+                        JsonVariant _as = targetData["auto_send"];
+                        bool autoSend = (!_as.isNull() && (_as.as<bool>() || _as.as<String>() == "1" || _as.as<String>() == "true"));
                         
+                        String _dbgJson; serializeJson(targetData, _dbgJson);
+                        LOG_DEBUG("WebServer", "ADD targetData raw: " + _dbgJson);
                         LOG_INFO("WebServer", "🔗 Obfuscated Password add: " + name);
                         
-                        if (passwordManager.addPassword(name, password, category)) {
+                        if (passwordManager.addPassword(name, password, category, autoSend)) {
                             LOG_INFO("WebServer", "🔗 Obfuscated Password added: " + name);
                             
                             JsonDocument responseDoc;
@@ -8868,6 +9903,7 @@ void WebServerManager::start() {
                             responseDoc["name"] = pwd.name;
                             responseDoc["password"] = pwd.password;
                             responseDoc["category"] = pwd.category;
+                            responseDoc["auto_send"] = pwd.auto_send;
                             String jsonResponse;
                             serializeJson(responseDoc, jsonResponse);
                             
@@ -8898,10 +9934,12 @@ void WebServerManager::start() {
                         String name = targetData["name"].as<String>();
                         String password = targetData["password"].as<String>();
                         String category = targetData["category"] | "";
+                        JsonVariant _as = targetData["auto_send"];
+                        bool autoSend = (!_as.isNull() && (_as.as<bool>() || _as.as<String>() == "1" || _as.as<String>() == "true"));
                         
                         LOG_INFO("WebServer", "🔗 Obfuscated Password update: index " + String(index) + ", name: " + name);
                         
-                        if (passwordManager.updatePassword(index, name, password, category)) {
+                        if (passwordManager.updatePassword(index, name, password, category, autoSend)) {
                             LOG_INFO("WebServer", "🔗 Obfuscated Password updated at index: " + String(index));
                             
                             JsonDocument responseDoc;
@@ -9003,7 +10041,8 @@ void WebServerManager::start() {
                                 obj["password"] = entry.password;
                                 obj["strength"] = entry.strength;
                                 obj["pw_hash"] = entry.pw_hash;
-                                obj["category"] = entry.category;
+                                obj["category"]  = entry.category;
+                                obj["auto_send"] = entry.auto_send;
                             }
                             serializeJson(doc, plaintext);
                             // JsonDocument автоматически освобождается здесь
@@ -9271,6 +10310,259 @@ void WebServerManager::start() {
                         return;
                     }
                     
+                    // /api/hidden_space GET
+                    if (targetEndpoint == "/api/hidden_space" && targetMethod == "GET") {
+                        if (request->hasHeader("X-User-Activity")) {
+                            resetActivityTimer();
+                        }
+                        
+                        CryptoManager& crypto = CryptoManager::getInstance();
+                        ActiveSpace currentSpace = crypto.getActiveSpace();
+                        bool hiddenProvisioned = crypto.isHiddenSpaceProvisioned();
+                        
+                        JsonDocument resp;
+                        resp["hidden_space_enabled"] = hiddenProvisioned;
+                        resp["current_space"] = (currentSpace == ActiveSpace::A ? "A" : 
+                                                 currentSpace == ActiveSpace::B ? "B" : "NONE");
+                        resp["can_enable"] = (currentSpace == ActiveSpace::A && !hiddenProvisioned);
+                        resp["can_disable"] = hiddenProvisioned;
+                        resp["share_wifi"] = crypto.isWifiSharedWithHiddenSpace();
+                        
+                        String out;
+                        serializeJson(resp, out);
+                        
+                        LOG_INFO("WebServer", "🔗 Obfuscated hidden_space GET");
+                        WebServerSecureIntegration::sendSecureResponse(request, 200, "application/json", out, secureLayer);
+                        if (bufferPtr) { delete bufferPtr; request->_tempObject = nullptr; }
+                        return;
+                    }
+                    
+                    // /api/hidden_space POST
+                    if (targetEndpoint == "/api/hidden_space" && targetMethod == "POST") {
+                        if (request->hasHeader("X-User-Activity")) {
+                            resetActivityTimer();
+                        }
+                        
+                        String action = targetData["action"].as<String>();
+                        
+                        if (action.isEmpty()) {
+                            String errorResp = "{\"error\":\"Missing action\"}";
+                            WebServerSecureIntegration::sendSecureResponse(request, 400, "application/json", errorResp, secureLayer);
+                            if (bufferPtr) { delete bufferPtr; request->_tempObject = nullptr; }
+                            return;
+                        }
+                        
+                        CryptoManager& crypto = CryptoManager::getInstance();
+                        ActiveSpace currentSpace = crypto.getActiveSpace();
+                        bool hiddenProvisioned = crypto.isHiddenSpaceProvisioned();
+                        
+                        if (action == "enable") {
+                            // Enable hidden space - must be in Space A
+                            if (currentSpace != ActiveSpace::A) {
+                                String errorResp = "{\"error\":\"must_be_in_space_a\"}";
+                                WebServerSecureIntegration::sendSecureResponse(request, 403, "application/json", errorResp, secureLayer);
+                                if (bufferPtr) { delete bufferPtr; request->_tempObject = nullptr; }
+                                return;
+                            }
+                            
+                            if (hiddenProvisioned) {
+                                String errorResp = "{\"error\":\"already_enabled\"}";
+                                WebServerSecureIntegration::sendSecureResponse(request, 409, "application/json", errorResp, secureLayer);
+                                if (bufferPtr) { delete bufferPtr; request->_tempObject = nullptr; }
+                                return;
+                            }
+                            
+                            // Create setup flag file
+                            File flagFile = LittleFS.open("/.setup_hidden_space", "w");
+                            if (!flagFile) {
+                                LOG_ERROR("WebServer", "🔗 Obfuscated: Failed to create hidden space setup flag");
+                                String errorResp = "{\"error\":\"failed_to_create_flag\"}";
+                                WebServerSecureIntegration::sendSecureResponse(request, 500, "application/json", errorResp, secureLayer);
+                                if (bufferPtr) { delete bufferPtr; request->_tempObject = nullptr; }
+                                return;
+                            }
+                            flagFile.print("1");
+                            flagFile.close();
+                            
+                            LOG_INFO("WebServer", "🔗 Obfuscated: Hidden space setup flag created, rebooting...");
+                            
+                            JsonDocument resp;
+                            resp["status"] = "rebooting";
+                            String out;
+                            serializeJson(resp, out);
+                            
+                            WebServerSecureIntegration::sendSecureResponse(request, 200, "application/json", out, secureLayer);
+                            if (bufferPtr) { delete bufferPtr; request->_tempObject = nullptr; }
+                            
+                            delay(500);
+                            ESP.restart();
+                            return;
+                            
+                        } else if (action == "disable") {
+                            // Disable/wipe hidden space
+                            if (!hiddenProvisioned) {
+                                String errorResp = "{\"error\":\"not_enabled\"}";
+                                WebServerSecureIntegration::sendSecureResponse(request, 409, "application/json", errorResp, secureLayer);
+                                if (bufferPtr) { delete bufferPtr; request->_tempObject = nullptr; }
+                                return;
+                            }
+                            
+                            if (currentSpace != ActiveSpace::A) {
+                                // Wipe only allowed from Space A
+                                LOG_INFO("WebServer", "🔗 Obfuscated: Wipe attempt from Space B - denied");
+                                String errorResp = "{\"error\":\"must_wipe_from_space_a\",\"message\":\"Hidden space can only be disabled from Space A\"}";
+                                WebServerSecureIntegration::sendSecureResponse(request, 403, "application/json", errorResp, secureLayer);
+                                if (bufferPtr) { delete bufferPtr; request->_tempObject = nullptr; }
+                                return;
+                            }
+                            
+                            // Wipe from Space A - allowed
+                            LOG_INFO("WebServer", "🔗 Obfuscated: Disabling hidden space from Space A");
+                                
+                                if (!crypto.wipeHiddenSpace()) {
+                                    LOG_ERROR("WebServer", "🔗 Obfuscated: Failed to wipe hidden space");
+                                    String errorResp = "{\"error\":\"wipe_failed\"}";
+                                    WebServerSecureIntegration::sendSecureResponse(request, 500, "application/json", errorResp, secureLayer);
+                                    if (bufferPtr) { delete bufferPtr; request->_tempObject = nullptr; }
+                                    return;
+                                }
+                                
+                                JsonDocument resp;
+                                resp["status"] = "wiped_rebooting";
+                                String out;
+                                serializeJson(resp, out);
+                                
+                                WebServerSecureIntegration::sendSecureResponse(request, 200, "application/json", out, secureLayer);
+                                if (bufferPtr) { delete bufferPtr; request->_tempObject = nullptr; }
+                                
+                                delay(500);
+                                ESP.restart();
+                                return;
+                            
+                        } else if (action == "set_share_wifi") {
+                            // Set WiFi sharing with hidden space
+                            if (currentSpace != ActiveSpace::A) {
+                                String errorResp = "{\"error\":\"must_be_in_space_a\"}";
+                                WebServerSecureIntegration::sendSecureResponse(request, 403, "application/json", errorResp, secureLayer);
+                                if (bufferPtr) { delete bufferPtr; request->_tempObject = nullptr; }
+                                return;
+                            }
+                            
+                            if (!hiddenProvisioned) {
+                                String errorResp = "{\"error\":\"hidden_space_not_enabled\"}";
+                                WebServerSecureIntegration::sendSecureResponse(request, 409, "application/json", errorResp, secureLayer);
+                                if (bufferPtr) { delete bufferPtr; request->_tempObject = nullptr; }
+                                return;
+                            }
+                            
+                            bool enabled = targetData["enabled"] | false;
+                            
+                            if (enabled) {
+                                // Enable WiFi sharing - decrypt Space A wifi and re-encrypt with chip key
+                                String srcPath = "/wifi_config.json.enc";  // Space A path
+                                String cachePath = "/.conn_cache";
+                                
+                                if (!LittleFS.exists(srcPath)) {
+                                    LOG_WARNING("WebServer", "🔗 Obfuscated: No WiFi config found to share");
+                                    String errorResp = "{\"error\":\"no_wifi_config\"}";
+                                    WebServerSecureIntegration::sendSecureResponse(request, 404, "application/json", errorResp, secureLayer);
+                                    if (bufferPtr) { delete bufferPtr; request->_tempObject = nullptr; }
+                                    return;
+                                }
+                                
+                                // Read encrypted Space A wifi data
+                                File srcFile = LittleFS.open(srcPath, "r");
+                                if (!srcFile) {
+                                    LOG_ERROR("WebServer", "🔗 Obfuscated: Failed to open source WiFi config");
+                                    String errorResp = "{\"error\":\"failed_to_read_wifi\"}";
+                                    WebServerSecureIntegration::sendSecureResponse(request, 500, "application/json", errorResp, secureLayer);
+                                    if (bufferPtr) { delete bufferPtr; request->_tempObject = nullptr; }
+                                    return;
+                                }
+                                String encryptedSpaceA = srcFile.readString();
+                                srcFile.close();
+                                
+                                // Decrypt with Space A device key (current active key)
+                                String plainWifi = crypto.decrypt(encryptedSpaceA);
+                                if (plainWifi.isEmpty()) {
+                                    LOG_ERROR("WebServer", "🔗 Obfuscated: Failed to decrypt WiFi config");
+                                    String errorResp = "{\"error\":\"decrypt_failed\"}";
+                                    WebServerSecureIntegration::sendSecureResponse(request, 500, "application/json", errorResp, secureLayer);
+                                    if (bufferPtr) { delete bufferPtr; request->_tempObject = nullptr; }
+                                    return;
+                                }
+                                
+                                // Re-encrypt with chip-derived shared key
+                                String sharedEncrypted = crypto.encryptForSharedCache(plainWifi);
+                                plainWifi = "";  // wipe plaintext
+                                
+                                // Write to shared cache
+                                File cacheFile = LittleFS.open(cachePath, "w");
+                                if (!cacheFile) {
+                                    LOG_ERROR("WebServer", "🔗 Obfuscated: Failed to create shared WiFi cache");
+                                    String errorResp = "{\"error\":\"failed_to_create_cache\"}";
+                                    WebServerSecureIntegration::sendSecureResponse(request, 500, "application/json", errorResp, secureLayer);
+                                    if (bufferPtr) { delete bufferPtr; request->_tempObject = nullptr; }
+                                    return;
+                                }
+                                cacheFile.print(sharedEncrypted);
+                                cacheFile.close();
+                                
+                                LOG_INFO("WebServer", "🔗 Obfuscated: WiFi config re-encrypted and saved to shared cache");
+                                
+                                // Set the flag
+                                if (!crypto.setShareWifiWithHiddenSpace(true)) {
+                                    LOG_ERROR("WebServer", "🔗 Obfuscated: Failed to set WiFi sharing flag");
+                                    String errorResp = "{\"error\":\"failed_to_set_flag\"}";
+                                    WebServerSecureIntegration::sendSecureResponse(request, 500, "application/json", errorResp, secureLayer);
+                                    if (bufferPtr) { delete bufferPtr; request->_tempObject = nullptr; }
+                                    return;
+                                }
+                                
+                                JsonDocument resp;
+                                resp["status"] = "wifi_shared";
+                                String out;
+                                serializeJson(resp, out);
+                                
+                                WebServerSecureIntegration::sendSecureResponse(request, 200, "application/json", out, secureLayer);
+                                if (bufferPtr) { delete bufferPtr; request->_tempObject = nullptr; }
+                                return;
+                                
+                            } else {
+                                // Disable WiFi sharing - remove shared cache
+                                String cachePath = "/.conn_cache";
+                                if (LittleFS.exists(cachePath)) {
+                                    LittleFS.remove(cachePath);
+                                    LOG_INFO("WebServer", "🔗 Obfuscated: WiFi sharing disabled, shared cache removed");
+                                }
+                                
+                                // Clear the flag
+                                if (!crypto.setShareWifiWithHiddenSpace(false)) {
+                                    LOG_ERROR("WebServer", "🔗 Obfuscated: Failed to clear WiFi sharing flag");
+                                    String errorResp = "{\"error\":\"failed_to_clear_flag\"}";
+                                    WebServerSecureIntegration::sendSecureResponse(request, 500, "application/json", errorResp, secureLayer);
+                                    if (bufferPtr) { delete bufferPtr; request->_tempObject = nullptr; }
+                                    return;
+                                }
+                                
+                                JsonDocument resp;
+                                resp["status"] = "wifi_unshared";
+                                String out;
+                                serializeJson(resp, out);
+                                
+                                WebServerSecureIntegration::sendSecureResponse(request, 200, "application/json", out, secureLayer);
+                                if (bufferPtr) { delete bufferPtr; request->_tempObject = nullptr; }
+                                return;
+                            }
+                            
+                        } else {
+                            String errorResp = "{\"error\":\"invalid_action\"}";
+                            WebServerSecureIntegration::sendSecureResponse(request, 400, "application/json", errorResp, secureLayer);
+                            if (bufferPtr) { delete bufferPtr; request->_tempObject = nullptr; }
+                            return;
+                        }
+                    }
+                    
                     // Fallback
                     LOG_WARNING("WebServer", "⚠️ Endpoint " + targetEndpoint + " not in obfuscated handler");
                     request->send(501, "application/json", "{\"error\":\"Not implemented\"}");
@@ -9452,15 +10744,39 @@ void WebServerManager::startConfigServer() {
     server.on("/ncsi.txt", HTTP_GET, [](AsyncWebServerRequest *r){ r->redirect("http://192.168.4.1"); });
     server.on("/fwlink", HTTP_GET, [](AsyncWebServerRequest *r){ r->redirect("http://192.168.4.1"); });
     
-    server.on("/", HTTP_GET, [this](AsyncWebServerRequest *request){
-        String html = wifi_setup_html;
-        if (!html.length()) {
-            request->send(503, "text/plain", "Out of memory");
-            return;
-        }
-        // Вставляем mDNS имя хоста по умолчанию в HTML для редиректа
-        html.replace("##MDNS_HOSTNAME##", DEFAULT_MDNS_HOSTNAME);
-        request->send(200, "text/html", html);
+    server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+        const size_t part1Len = strlen_P(wifi_setup_html_part1);
+        const size_t hostnameLen = strlen(DEFAULT_MDNS_HOSTNAME);
+        const size_t part2Len = strlen_P(wifi_setup_html_part2);
+
+        AsyncWebServerResponse *response = request->beginChunkedResponse("text/html",
+            [part1Len, hostnameLen, part2Len](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
+                // Part 1 — PROGMEM
+                if (index < part1Len) {
+                    size_t toCopy = min(maxLen, part1Len - index);
+                    memcpy_P(buffer, wifi_setup_html_part1 + index, toCopy);
+                    return toCopy;
+                }
+                // Hostname — const char*
+                size_t hostnameStart = part1Len;
+                if (index < hostnameStart + hostnameLen) {
+                    size_t localIdx = index - hostnameStart;
+                    size_t toCopy = min(maxLen, hostnameLen - localIdx);
+                    memcpy(buffer, DEFAULT_MDNS_HOSTNAME + localIdx, toCopy);
+                    return toCopy;
+                }
+                // Part 2 — PROGMEM
+                size_t part2Start = part1Len + hostnameLen;
+                if (index < part2Start + part2Len) {
+                    size_t localIdx = index - part2Start;
+                    size_t toCopy = min(maxLen, part2Len - localIdx);
+                    memcpy_P(buffer, wifi_setup_html_part2 + localIdx, toCopy);
+                    return toCopy;
+                }
+                return 0; // done
+            }
+        );
+        request->send(response);
     });
     server.on("/scan", HTTP_GET, [](AsyncWebServerRequest *request){
         static unsigned long lastConfigScanStart = 0;

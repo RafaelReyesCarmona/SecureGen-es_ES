@@ -34,6 +34,7 @@ DisplayManager::DisplayManager() : tft(TFT_eSPI()), animationManager(), headerSp
 }
 
 void DisplayManager::setTheme(Theme theme) {
+    _isNoItemsPageActive = false;  // force redraw after theme change
     LOG_INFO("DisplayManager", "setTheme() called with theme: " + String((theme == Theme::LIGHT) ? "LIGHT" : "DARK"));
     switch (theme) {
         case Theme::DARK:
@@ -1033,7 +1034,7 @@ void DisplayManager::drawPasswordLayout(const String& name, const String& passwo
                                         int batteryPercentage, bool isCharging,
                                         bool isWebServerOn,
                                         uint8_t strength, bool isDuplicate,
-                                        bool isPin, bool isName) {
+                                        bool isPin, bool isName, bool auto_send) {
     if (_isNoItemsPageActive) {
         _isNoItemsPageActive = false;
         tft.fillScreen(_currentThemeColors->background_dark); 
@@ -1089,10 +1090,11 @@ void DisplayManager::drawPasswordLayout(const String& name, const String& passwo
         if (isDuplicate)  elems++;
         if (isPin)        elems++;
         if (isName)       elems++;
+        if (auto_send)     elems++;
         
         int totalW = 0;
         if (strength > 0) totalW += lockW;
-        int badgeCount = (isDuplicate?1:0) + (isPin?1:0) + (isName?1:0);
+        int badgeCount = (isDuplicate?1:0) + (isPin?1:0) + (isName?1:0) + (auto_send?1:0);
         totalW += badgeCount * badgeW;
         if (elems > 1) totalW += (elems - 1) * gap;
         
@@ -1112,6 +1114,10 @@ void DisplayManager::drawPasswordLayout(const String& name, const String& passwo
         }
         if (isName) {
             drawTextBadge(curX, rowY - 6, "NAME", 0xFD20); // orange
+            curX += badgeW + gap;
+        }
+        if (auto_send) {
+            drawTextBadge(curX, rowY - 6, "ENT", 0x07E0); // green
         }
     }
 

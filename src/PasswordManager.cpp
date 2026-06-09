@@ -89,7 +89,7 @@ uint8_t PasswordManager::computeStrength(const String& password) {
     return 1;                  // weak
 }
 
-bool PasswordManager::addPassword(const String& name, const String& password, const String& category) {
+bool PasswordManager::addPassword(const String& name, const String& password, const String& category, bool auto_send) {
     if (name.isEmpty() || password.isEmpty()) {
         LOG_WARNING("PasswordManager", "Cannot add password with empty name or value");
         return false;
@@ -103,6 +103,7 @@ bool PasswordManager::addPassword(const String& name, const String& password, co
     newPassword.name = name;
     newPassword.password = password;
     newPassword.category = category;
+    newPassword.auto_send = auto_send;
     newPassword.order = maxOrder + 1;
     // Compute strength and hash before storing
     newPassword.strength = computeStrength(password);
@@ -116,7 +117,7 @@ bool PasswordManager::addPassword(const String& name, const String& password, co
     return success;
 }
 
-bool PasswordManager::updatePassword(int index, const String& name, const String& password, const String& category) {
+bool PasswordManager::updatePassword(int index, const String& name, const String& password, const String& category, bool auto_send) {
     if (index < 0 || index >= passwords.size()) {
         LOG_WARNING("PasswordManager", "Invalid password index for update: " + String(index));
         return false;
@@ -128,6 +129,7 @@ bool PasswordManager::updatePassword(int index, const String& name, const String
     passwords[index].name = name;
     passwords[index].password = password;
     passwords[index].category = category;
+    passwords[index].auto_send = auto_send;
     // Recompute strength and hash on update
     passwords[index].strength = computeStrength(password);
     passwords[index].pw_hash  = computePwHash(password);
@@ -199,12 +201,15 @@ std::vector<PasswordEntry> PasswordManager::getAllPasswordsForExport() {
     // Принудительно перезагружаем и расшифровываем пароли из файла
     std::vector<PasswordEntry> exportPasswords;
     
-    if (!LittleFS.exists(PASSWORD_FILE)) {
+    // Use space-aware path
+    String passwordPath = CryptoManager::getInstance().getSpacePath("passwords");
+    
+    if (!LittleFS.exists(passwordPath)) {
         LOG_INFO("PasswordManager", "Password file does not exist for export");
         return exportPasswords; // Пустой вектор если файл не существует
     }
 
-    File file = LittleFS.open(PASSWORD_FILE, "r");
+    File file = LittleFS.open(passwordPath, "r");
     if (!file) {
         LOG_ERROR("PasswordManager", "Failed to open password file for export");
         return exportPasswords;
@@ -239,7 +244,8 @@ std::vector<PasswordEntry> PasswordManager::getAllPasswordsForExport() {
         entry.order = obj["order"] | 0;
         entry.strength = obj["strength"] | 0;
         entry.pw_hash = obj["pw_hash"] | "";
-        entry.category = obj["category"] | "";  // backward-compat: old entries default to ""
+        entry.category  = obj["category"]  | "";  // backward-compat: old entries default to ""
+        entry.auto_send = obj["auto_send"] | false;
         exportPasswords.push_back(entry);
     }
 
@@ -266,7 +272,8 @@ bool PasswordManager::replaceAllPasswords(const String& jsonContent) {
         entry.order = obj["order"] | currentOrder++;  // Используем существующий order или назначаем по порядку
         entry.strength = obj["strength"] | (uint8_t)0;
         entry.pw_hash  = obj["pw_hash"] | String("");
-        entry.category = obj["category"] | "";  // backward-compat: old entries default to ""
+        entry.category  = obj["category"]  | "";  // backward-compat: old entries default to ""
+        entry.auto_send = obj["auto_send"] | false;
         // Recompute missing fields (handles legacy import files)
         if (entry.strength == 0 || entry.pw_hash.isEmpty()) {
             entry.strength = computeStrength(entry.password);
@@ -287,12 +294,16 @@ bool PasswordManager::replaceAllPasswords(const String& jsonContent) {
 
 bool PasswordManager::loadPasswords() {
     LOG_DEBUG("PasswordManager", "Loading passwords from file");
-    if (!LittleFS.exists(PASSWORD_FILE)) {
+    
+    // Use space-aware path
+    String passwordPath = CryptoManager::getInstance().getSpacePath("passwords");
+    
+    if (!LittleFS.exists(passwordPath)) {
         LOG_INFO("PasswordManager", "Password file doesn't exist yet, starting with empty list");
         return true; // File doesn't exist yet, which is fine.
     }
 
-    File file = LittleFS.open(PASSWORD_FILE, "r");
+    File file = LittleFS.open(passwordPath, "r");
     if (!file) {
         LOG_ERROR("PasswordManager", "Failed to open password file for reading");
         return false;
@@ -332,7 +343,8 @@ bool PasswordManager::loadPasswords() {
         entry.order = obj["order"] | currentOrder++;  // Используем существующий order или назначаем по порядку
         entry.strength = obj["strength"] | 0;
         entry.pw_hash = obj["pw_hash"] | "";
-        entry.category = obj["category"] | "";  // backward-compat: old entries default to ""
+        entry.category  = obj["category"]  | "";  // backward-compat: old entries default to ""
+        entry.auto_send = obj["auto_send"] | false;
         // Migration: compute missing fields for legacy entries
         if (entry.strength == 0 || entry.pw_hash.isEmpty()) {
             entry.strength = computeStrength(entry.password);
@@ -358,7 +370,8 @@ bool PasswordManager::savePasswords() {
         obj["order"]    = entry.order;
         obj["strength"] = entry.strength;
         obj["pw_hash"]  = entry.pw_hash;
-        obj["category"] = entry.category;
+        obj["category"]  = entry.category;
+        obj["auto_send"] = entry.auto_send;
     }
 
     String jsonData;
@@ -375,7 +388,10 @@ bool PasswordManager::savePasswords() {
         return false;
     }
 
-    File file = LittleFS.open(PASSWORD_FILE, "w");
+    // Use space-aware path
+    String passwordPath = CryptoManager::getInstance().getSpacePath("passwords");
+    
+    File file = LittleFS.open(passwordPath, "w");
     if (!file) {
         LOG_ERROR("PasswordManager", "Failed to open password file for writing");
         return false;

@@ -16,6 +16,7 @@ const char* MethodTunnelingManager::tunnelingEnabledEndpoints[] = {
     "/api/keys/add",       // Add TOTP keys
     "/api/keys/delete",    // Delete TOTP keys
     "/api/pincode_settings", // PIN settings - КРИТИЧНО (содержит настройки безопасности)
+    "/api/hidden_space",   // Hidden Space management - КРИТИЧНО (скрытое пространство)
     "/api/theme",          // Theme settings - КРИТИЧНО (тема устройства)
     "/api/display_settings", // Display timeout - КРИТИЧНО (таймаут экрана)
     "/api/splash/mode",    // Splash screen selection - КРИТИЧНО (выбор изображений)

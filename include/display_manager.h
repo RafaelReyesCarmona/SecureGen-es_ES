@@ -23,7 +23,9 @@ public:
     void updateHeader();
     
     void drawLayout(const String& serviceName, int batteryPercentage, bool isCharging, bool isWebServerOn); 
-    void drawPasswordLayout(const String& name, const String& password, int batteryPercentage, bool isCharging, bool isWebServerOn, uint8_t strength = 0, bool isDuplicate = false, bool isPin = false, bool isName = false);
+    void drawPasswordLayout(const String& name, const String& password, int batteryPercentage, bool isCharging, bool isWebServerOn, uint8_t strength = 0, bool isDuplicate = false, bool isPin = false, bool isName = false, bool auto_send = false);
+    
+
     void updateBatteryStatus(int percentage, bool isCharging);
     void updateClockStatus();
     void updateTOTPCode(const String& code, int timeRemaining, int period = 30);

@@ -49,8 +49,9 @@ void WebAdminManager::begin() {
 }
 
 void WebAdminManager::loadCredentials() {
-    if (LittleFS.exists(WEB_ADMIN_FILE)) {
-        fs::File file = LittleFS.open(WEB_ADMIN_FILE, "r");
+    String webAdminPath = CryptoManager::getInstance().getSpacePath("web_admin");
+    if (LittleFS.exists(webAdminPath)) {
+        fs::File file = LittleFS.open(webAdminPath, "r");
         if (file) {
             String encrypted_base64 = file.readString();
             file.close();
@@ -145,7 +146,8 @@ bool WebAdminManager::registerAdmin(const String& username, const String& passwo
     String json_string;
     serializeJson(doc, json_string);
     String encrypted_base64 = CryptoManager::getInstance().encrypt(json_string);
-    fs::File file = LittleFS.open(WEB_ADMIN_FILE, "w");
+    String webAdminPath = CryptoManager::getInstance().getSpacePath("web_admin");
+    fs::File file = LittleFS.open(webAdminPath, "w");
     if (!file) return false;
     file.print(encrypted_base64);
     file.close();
@@ -160,7 +162,8 @@ bool WebAdminManager::verifyCredentials(const String& username, const String& pa
     if (!isRegistered() || username != _username) {
         return false;
     }
-    fs::File file = LittleFS.open(WEB_ADMIN_FILE, "r");
+    String webAdminPath = CryptoManager::getInstance().getSpacePath("web_admin");
+    fs::File file = LittleFS.open(webAdminPath, "r");
     if (!file) return false;
     String encrypted_base64 = file.readString();
     file.close();
@@ -181,7 +184,8 @@ bool WebAdminManager::changePassword(const String& newPassword) {
     String json_string;
     serializeJson(doc, json_string);
     String encrypted_base64 = CryptoManager::getInstance().encrypt(json_string);
-    fs::File file = LittleFS.open(WEB_ADMIN_FILE, "w");
+    String webAdminPath = CryptoManager::getInstance().getSpacePath("web_admin");
+    fs::File file = LittleFS.open(webAdminPath, "w");
     if (!file) return false;
     file.print(encrypted_base64);
     file.close();

@@ -178,6 +178,26 @@ bool ConfigManager::saveStartupMode(const String& mode) {
 
 #ifdef BOARD_HAS_USB_HID
 String ConfigManager::getDefaultHidMode() {
+    // Try per-space HID mode file first
+    String hidModePath = CryptoManager::getInstance().getSpacePath("hid_mode");
+    
+    if (LittleFS.exists(hidModePath)) {
+        fs::File hf = LittleFS.open(hidModePath, "r");
+        if (hf) {
+            JsonDocument hdoc;
+            if (deserializeJson(hdoc, hf) == DeserializationError::Ok) {
+                String mode = hdoc["hid_mode"] | "";
+                if (mode == "ble" || mode == "usb") {
+                    hf.close();
+                    LOG_INFO("ConfigManager", "Loaded HID mode from per-space file: " + mode);
+                    return mode;
+                }
+            }
+            hf.close();
+        }
+    }
+    
+    // Fallback to global config for backward compatibility
     if (LittleFS.exists(CONFIG_FILE)) {
         fs::File configFile = LittleFS.open(CONFIG_FILE, "r");
         if (configFile) {
@@ -185,7 +205,7 @@ String ConfigManager::getDefaultHidMode() {
             if (deserializeJson(doc, configFile) == DeserializationError::Ok) {
                 String mode = doc["default_hid_mode"] | "ble";
                 configFile.close();
-                LOG_INFO("ConfigManager", "Loaded default HID mode: " + mode);
+                LOG_INFO("ConfigManager", "Loaded default HID mode from global config: " + mode);
                 return mode;
             }
             configFile.close();
@@ -196,23 +216,40 @@ String ConfigManager::getDefaultHidMode() {
 
 bool ConfigManager::saveDefaultHidMode(const String& mode) {
     LOG_INFO("ConfigManager", "saveDefaultHidMode() called with mode: " + mode);
-    JsonDocument doc;
     
-    if (LittleFS.exists(CONFIG_FILE)) {
-        fs::File configFile = LittleFS.open(CONFIG_FILE, "r");
-        if (configFile) {
-            deserializeJson(doc, configFile);
-            configFile.close();
+    // Save to per-space file
+    String hidModePath = CryptoManager::getInstance().getSpacePath("hid_mode");
+    JsonDocument hdoc;
+    hdoc["hid_mode"] = mode;
+    
+    fs::File hf = LittleFS.open(hidModePath, "w");
+    if (hf) {
+        size_t bytesWritten = serializeJson(hdoc, hf);
+        hf.close();
+        
+        if (bytesWritten > 0) {
+            LOG_INFO("ConfigManager", "HID mode saved to per-space file: " + mode);
+            
+            // Also update global config for Space A (backward compatibility)
+            if (CryptoManager::getInstance().getActiveSpace() == ActiveSpace::A) {
+                JsonDocument doc;
+                if (LittleFS.exists(CONFIG_FILE)) {
+                    fs::File configFile = LittleFS.open(CONFIG_FILE, "r");
+                    if (configFile) {
+                        deserializeJson(doc, configFile);
+                        configFile.close();
+                    }
+                }
+                doc["default_hid_mode"] = mode;
+                fs::File configFile = LittleFS.open(CONFIG_FILE, "w");
+                if (configFile) {
+                    serializeJson(doc, configFile);
+                    configFile.close();
+                }
+            }
+            
+            return true;
         }
-    }
-    
-    doc["default_hid_mode"] = mode;
-    
-    fs::File configFile = LittleFS.open(CONFIG_FILE, "w");
-    if (configFile) {
-        size_t bytesWritten = serializeJson(doc, configFile);
-        configFile.close();
-        return (bytesWritten > 0);
     }
     return false;
 }
@@ -531,34 +568,80 @@ uint16_t ConfigManager::getDisplayTimeout() {
 }
 
 String ConfigManager::getTimezone() {
-    if (!LittleFS.exists(CONFIG_FILE)) return "UTC0";
-    fs::File configFile = LittleFS.open(CONFIG_FILE, "r");
-    if (!configFile) return "UTC0";
-    JsonDocument doc;
-    if (deserializeJson(doc, configFile) != DeserializationError::Ok) {
-        configFile.close();
-        return "UTC0";
+    LOG_INFO("ConfigManager", "getTimezone() reading from global config: " + String(CONFIG_FILE));
+    if (LittleFS.exists(CONFIG_FILE)) {
+        fs::File configFile = LittleFS.open(CONFIG_FILE, "r");
+        if (configFile) {
+            String fileContent = configFile.readString();
+            LOG_INFO("ConfigManager", "getTimezone() file content: " + fileContent);
+            configFile.close();
+            
+            // Re-open for deserialization
+            configFile = LittleFS.open(CONFIG_FILE, "r");
+            if (configFile) {
+                JsonDocument doc;
+                DeserializationError error = deserializeJson(doc, configFile);
+                configFile.close();
+                if (error == DeserializationError::Ok) {
+                    String tz = doc["timezone"] | "UTC0";
+                    LOG_INFO("ConfigManager", "getTimezone() successfully loaded timezone: " + tz);
+                    return tz;
+                } else {
+                    LOG_ERROR("ConfigManager", "getTimezone() failed to deserialize config: " + String(error.c_str()));
+                }
+            } else {
+                LOG_ERROR("ConfigManager", "getTimezone() failed to re-open config file for parsing");
+            }
+        } else {
+            LOG_ERROR("ConfigManager", "getTimezone() failed to open config file for reading");
+        }
+    } else {
+        LOG_INFO("ConfigManager", "getTimezone() config file does not exist, using default UTC0");
     }
-    configFile.close();
-    return doc["timezone"] | "UTC0";
+    return "UTC0";
 }
 
 bool ConfigManager::saveTimezone(const String& tz) {
+    LOG_INFO("ConfigManager", "saveTimezone() called with timezone: " + tz);
     JsonDocument doc;
     if (LittleFS.exists(CONFIG_FILE)) {
         fs::File configFile = LittleFS.open(CONFIG_FILE, "r");
         if (configFile) {
-            deserializeJson(doc, configFile);
+            DeserializationError error = deserializeJson(doc, configFile);
             configFile.close();
+            if (error != DeserializationError::Ok) {
+                LOG_WARNING("ConfigManager", "saveTimezone() failed to parse existing config: " + String(error.c_str()));
+            }
         }
     }
+    
     doc["timezone"] = tz;
     fs::File configFile = LittleFS.open(CONFIG_FILE, "w");
-    if (!configFile) return false;
-    serializeJson(doc, configFile);
+    if (!configFile) {
+        LOG_ERROR("ConfigManager", "saveTimezone() failed to open config file for writing");
+        return false;
+    }
+    
+    size_t bytesWritten = serializeJson(doc, configFile);
     configFile.close();
+    
+    if (bytesWritten == 0) {
+        LOG_ERROR("ConfigManager", "saveTimezone() failed to serialize/write config");
+        return false;
+    }
+    
+    // Log the new contents of the file
+    configFile = LittleFS.open(CONFIG_FILE, "r");
+    if (configFile) {
+        String fileContent = configFile.readString();
+        LOG_INFO("ConfigManager", "saveTimezone() verified file content after save: " + fileContent);
+        configFile.close();
+    }
+    
+    LOG_INFO("ConfigManager", "saveTimezone() successfully saved timezone: " + tz);
     return true;
 }
+
 
 bool ConfigManager::saveDisplayTimeout(uint16_t timeout) {
     LOG_INFO("ConfigManager", "saveDisplayTimeout() called with value: " + String(timeout) + " seconds");
@@ -828,28 +911,20 @@ String ConfigManager::loadApPassword() {
         return "12345678";
     }
 
-    String encryptedPassword = doc["apPassword"] | "";
+    String apPassword = doc["apPassword"] | "";
     
-    if (encryptedPassword.isEmpty()) {
+    if (apPassword.isEmpty()) {
         // Нет сохраненного пароля, возвращаем дефолт
         return "12345678";
     }
     
-    // Пытаемся расшифровать
-    String apPassword = CryptoManager::getInstance().decrypt(encryptedPassword);
-    
-    if (apPassword.isEmpty()) {
-        // Возможно это старый plaintext пароль, пробуем использовать как есть
-        if (encryptedPassword.length() >= 8 && encryptedPassword.length() <= 63) {
-            LOG_INFO("ConfigManager", "Found legacy plaintext password, will migrate on next save");
-            // Возвращаем plaintext пароль, миграция произойдет при следующем сохранении
-            return encryptedPassword;
-        }
-        LOG_WARNING("ConfigManager", "Failed to decrypt AP password, using default");
+    // Validate password length (WiFi AP requires 8-63 chars)
+    if (apPassword.length() < 8 || apPassword.length() > 63) {
+        LOG_WARNING("ConfigManager", "Invalid AP password length, using default");
         return "12345678";
     }
     
-    LOG_INFO("ConfigManager", "AP Password loaded (encrypted): " + String(encryptedPassword.length()) + " chars");
+    LOG_INFO("ConfigManager", "AP Password loaded: " + String(apPassword.length()) + " chars");
     return apPassword;
 }
 
@@ -870,9 +945,8 @@ bool ConfigManager::saveApPassword(const String& password) {
         }
     }
 
-    // Обновляем значение (зашифрованное)
-    String encryptedPassword = CryptoManager::getInstance().encrypt(password);
-    doc["apPassword"] = encryptedPassword;
+    // Обновляем значение (plaintext)
+    doc["apPassword"] = password;
 
     // Сохраняем обратно
     fs::File configFile = LittleFS.open(CONFIG_FILE, "w");

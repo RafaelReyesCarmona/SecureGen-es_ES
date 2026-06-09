@@ -50,8 +50,9 @@ void PinManager::loadPinConfig() {
     }
     
     // Загружаем остальные настройки из зашифрованного файла (только если device key инициализирован)
-    if (LittleFS.exists(PIN_FILE) && CryptoManager::getInstance().isDeviceKeyInitialized()) {
-        fs::File configFile = LittleFS.open(PIN_FILE, "r");
+    String pinFilePath = CryptoManager::getInstance().getSpacePath("pin_config");
+    if (LittleFS.exists(pinFilePath) && CryptoManager::getInstance().isDeviceKeyInitialized()) {
+        fs::File configFile = LittleFS.open(pinFilePath, "r");
         if (configFile) {
             String encryptedContent = configFile.readString();
             configFile.close();
@@ -105,7 +106,8 @@ void PinManager::savePinConfig() {
         return;
     }
 
-    fs::File configFile = LittleFS.open(PIN_FILE, "w");
+    String pinFilePath = CryptoManager::getInstance().getSpacePath("pin_config");
+    fs::File configFile = LittleFS.open(pinFilePath, "w");
     if (configFile) {
         size_t bytesWritten = configFile.print(encryptedContent);
         configFile.close();
@@ -169,13 +171,14 @@ void PinManager::updatePinScreen(int currentPosition, int currentDigit, const St
     tft->drawString(selector, centerX, selectorY);
 }
 
-String PinManager::requestPinInput(const String& title, bool isConfirmScreen) {
+String PinManager::requestPinInput(const String& title, bool isConfirmScreen, int entryGuardMs) {
     LOG_INFO("PinManager", "PIN entry requested: " + title);
 
     String enteredPin = "";
     int currentDigit = 0;
-    unsigned long lastButtonPress = 0;
-    const int debounce = 150;
+    unsigned long entryTimestamp = millis();
+    unsigned long lastButtonPress = millis();
+    const int debounce = 75;
     
     displayManager.setBrightness(128); // 50% для экономии батареи
     
@@ -184,6 +187,11 @@ String PinManager::requestPinInput(const String& title, bool isConfirmScreen) {
 
     while (true) {
         esp_task_wdt_reset();
+        
+        if (millis() - entryTimestamp < entryGuardMs) {
+            delay(50);
+            continue;
+        }
         
         // Проверка отмены (обе кнопки) - переход в deep sleep
         if (readBtn1() && readBtn2()) {
@@ -432,8 +440,8 @@ bool PinManager::requestDevicePin() {
     loadPinConfig();
     LOG_INFO("PinManager", "Loaded PIN config: length=" + String(currentPinLength));
     
-    // Запрашиваем PIN
-    String enteredPin = requestPinInput("Enter Device PIN");
+    // Запрашиваем PIN — без entry guard (стартовый пин, намеренное нажатие)
+    String enteredPin = requestPinInput("Enter Device PIN", false, 0);
     unsigned long waitStart = millis();
     while(readBtn1() || readBtn2()) {
         esp_task_wdt_reset();
@@ -535,6 +543,7 @@ bool PinManager::requestDeviceBlePinForTransmission() {
         tft->setTextColor(TFT_GREEN);
         tft->drawString("PIN OK", centerX, 67);
         delay(1000);
+        displayManager.setBrightness(255);
         currentPinLength = savedPinLength;
         return true;
     } else {
@@ -544,6 +553,7 @@ bool PinManager::requestDeviceBlePinForTransmission() {
         tft->setTextColor(TFT_RED);
         tft->drawString("WRONG PIN!", centerX, 67);
         delay(2000);
+        displayManager.setBrightness(255);
         currentPinLength = savedPinLength;
         return false;
     }

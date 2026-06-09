@@ -13,10 +13,13 @@ WifiManager::WifiManager(DisplayManager& display, ConfigManager& configManager)
 bool WifiManager::loadCredentials(String& ssid, String& password) {
     LOG_DEBUG("WifiManager", "Loading WiFi credentials");
     
-    // 🔒 Проверяем зашифрованный файл
-    if (LittleFS.exists(WIFI_CONFIG_FILE)) {
-        LOG_DEBUG("WifiManager", "Loading encrypted WiFi config");
-        File file = LittleFS.open(WIFI_CONFIG_FILE, "r");
+    // 🔒 Проверяем зашифрованный файл (space-aware path)
+    String wifiConfigPath = CryptoManager::getInstance().getSpacePath("wifi");
+    
+    // Try space-specific path first
+    if (LittleFS.exists(wifiConfigPath)) {
+        LOG_DEBUG("WifiManager", "Loading encrypted WiFi config from: " + wifiConfigPath);
+        File file = LittleFS.open(wifiConfigPath, "r");
         if (!file) {
             LOG_ERROR("WifiManager", "Failed to open encrypted WiFi config file");
             return false;
@@ -54,6 +57,51 @@ bool WifiManager::loadCredentials(String& ssid, String& password) {
         }
         
         LOG_INFO("WifiManager", "WiFi credentials loaded (encrypted) for SSID: " + ssid);
+        return true;
+    }
+    
+    // 🔄 Try shared WiFi cache (for Space B when WiFi sharing is enabled)
+    String sharedCachePath = "/.conn_cache";
+    if (LittleFS.exists(sharedCachePath)) {
+        LOG_INFO("WifiManager", "Space-specific WiFi config not found, trying shared cache");
+        File file = LittleFS.open(sharedCachePath, "r");
+        if (!file) {
+            LOG_ERROR("WifiManager", "Failed to open shared WiFi cache");
+            return false;
+        }
+
+        String encrypted_base64 = file.readString();
+        file.close();
+
+        if (encrypted_base64.length() == 0) {
+            LOG_WARNING("WifiManager", "Shared WiFi cache is empty");
+            return false;
+        }
+
+        // Дешифруем данные с chip-derived ключом
+        String json_string = CryptoManager::getInstance().decryptFromSharedCache(encrypted_base64);
+        if (json_string.length() == 0) {
+            LOG_ERROR("WifiManager", "Failed to decrypt shared WiFi cache");
+            return false;
+        }
+        
+        // Парсим JSON
+        JsonDocument doc;
+        DeserializationError error = deserializeJson(doc, json_string);
+        if (error) {
+            LOG_ERROR("WifiManager", "JSON parsing failed for shared WiFi cache: " + String(error.c_str()));
+            return false;
+        }
+
+        ssid = doc["ssid"].as<String>();
+        password = doc["password"].as<String>();
+        
+        if (ssid.length() == 0) {
+            LOG_WARNING("WifiManager", "Empty SSID in shared WiFi cache");
+            return false;
+        }
+        
+        LOG_INFO("WifiManager", "WiFi credentials loaded from shared cache (Space A) for SSID: " + ssid);
         return true;
     }
     
@@ -300,10 +348,11 @@ bool WifiManager::saveCredentials(const String& ssid, const String& password) {
         return false;
     }
 
-    // Сохраняем в файл
-    File file = LittleFS.open(WIFI_CONFIG_FILE, "w");
+    // Сохраняем в файл (space-aware path)
+    String wifiConfigPath = CryptoManager::getInstance().getSpacePath("wifi");
+    File file = LittleFS.open(wifiConfigPath, "w");
     if (!file) {
-        LOG_ERROR("WifiManager", "Failed to open WiFi config file for writing");
+        LOG_ERROR("WifiManager", "Failed to open WiFi config file for writing: " + wifiConfigPath);
         return false;
     }
     
@@ -311,7 +360,7 @@ bool WifiManager::saveCredentials(const String& ssid, const String& password) {
     file.close();
     
     if (bytesWritten > 0) {
-        LOG_INFO("WifiManager", "WiFi credentials saved successfully (encrypted) for SSID: " + ssid);
+        LOG_INFO("WifiManager", "WiFi credentials saved successfully (encrypted) for SSID: " + ssid + " to: " + wifiConfigPath);
         return true;
     } else {
         LOG_ERROR("WifiManager", "Failed to write encrypted WiFi credentials");

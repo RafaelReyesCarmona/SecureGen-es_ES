@@ -17,9 +17,11 @@
 #define CONFIG_TOTP_DIGITS 6
 
 // Файловая система
+// NOTE: "keys", "passwords", "wifi", "session", "ble_pin", "device_ble_pin", "duress_pin" 
+// are space-aware files (Space A uses paths below, Space B uses HMAC-derived paths)
 #define KEYS_FILE "/keys.json.enc"
 #define PASSWORD_FILE "/passwords.json.enc"
-#define WIFI_CONFIG_FILE "/wifi_config.json.enc"  // Зашифрованный файл WiFi credentials
+#define WIFI_CONFIG_FILE "/wifi_config.json.enc"  // Space A path (Space B uses HMAC-derived path via getSpacePath("wifi"))
 #define WIFI_CONFIG_FILE_LEGACY "/wifi_config.json"  // Старый plain text файл для миграции
 #define SPLASH_IMAGE_PATH "/splash.raw"
 #define AUTH_FILE "/auth.json"

@@ -1,5 +1,23 @@
 # Changelog
 
+## [2.4.0] — May 2026
+### Added
+- **Hidden Space** — second independent encrypted vault selectable at boot via
+  alternate PIN. Each space has isolated TOTP keys, passwords, web cabinet
+  credentials, WiFi config, BLE PIN, Device BLE PIN, Duress PIN, display theme,
+  startup mode, and HID mode. Spaces share only hardware-level settings: boot mode,
+  RTC config, display settings, web server timeout, session duration, AP password,
+  BLE device name, and mDNS hostname. Space B web cabinet hides all shared settings.
+- **WiFi sharing** — optional: share Space A WiFi credentials with Space B
+  via re-encryption with a chip-derived key (configurable in web cabinet,
+  Space A context only).
+- **Auto-Send (Enter)** — new per-password flag in Password Manager; when enabled, device automatically presses Enter via BLE/USB HID after typing the password. Configurable per entry in web cabinet and offline decrypt tool. ENT badge shown on device display.
+
+### Fixed
+- `quickUpdateCategory()` — quick category change via badge pill now preserves `auto_send` flag (previously reset to false on category switch)/
+- Name of key file obfuscated
+- PROGMEM copy bug(first web server open wasnt loading, loaded after page refresh)
+
 ## [2.3.0] — May 2026
 ### Security Enhancements
 - **Duress PIN with memory zeroing** — multi-layer duress PIN triggers advanced memory 

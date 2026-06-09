@@ -182,6 +182,14 @@
 - PIN protection for BLE transmission
 - Encrypted export/import for backup and migration
 
+### 🔒 Hidden Space
+- **Two independent vaults** — alternate PIN at boot unlocks a fully isolated 
+  second space with its own TOTP keys, passwords, and web cabinet account 
+- **Optional WiFi sharing** — Space B can inherit Space A WiFi credentials 
+  with one toggle; disabled by default 
+- **Full isolation** — separate BLE PIN, web admin credentials, and session 
+  per space; spaces cannot read each other's data 
+
 ### 🌐 Web Management Interface
 - Runs on the device itself — no cloud, no external servers
 - Full TOTP and password management from any browser
@@ -215,6 +223,8 @@ All sensitive data is encrypted with AES-256 using a unique per-device key deriv
 **8 layers of web protection:** key exchange → session encryption → URL obfuscation → header obfuscation → decoy traffic → method tunneling → timing protection → honeypot endpoints.
 
 **Device security:** PIN with persistent lockout (5 attempts across reboots), secure memory wipe before deep sleep, encrypted BLE pairing.
+
+**Hidden Space:** two-slot device key file; Space B unlocked only by its own PIN via independent PBKDF2 derivation; wipe zeroes slot and deletes all HMAC-derived files.
 
 ### Known Limitations
 - PBKDF2 iteration count (25,000) is below OWASP 2023 recommendations due to ESP32 hardware constraints
@@ -297,6 +307,7 @@ pio run -e lilygo-t-display-s3 -t upload
 | [Logging System](docs/development/LOGGING_SYSTEM.md) | Debug and log configuration |
 | [Multi-Board Support](docs/development/multi-board.md) | Internal multi-board development rules (for maintainers) |
 | [Hardware Porting Guide](docs/development/PORTING.md) | Port SecureGen to your own ESP32 board |
+| [Abandoned Ideas](docs/development/abandoned-ideas.md) | Rejected features and architectural decisions |
 
 ---
 
@@ -311,6 +322,7 @@ pio run -e lilygo-t-display-s3 -t upload
   device; ephemeral key derived on-device, never entered manually
 - Flash encryption and secure boot (optional hardening)
 - ATECC608 secure element support
+- SD Card Module Support for pin code + cryptokey unlock feature
 
 ### Cryptography
 - Migration ECDH P-256 → X25519 (~400ms → ~80ms key exchange)

@@ -52,6 +52,8 @@ BLE password transfer is not available when the web server is running.
 
 The startup PIN encrypts the master device key. Disabling the PIN leaves the key file unencrypted on the filesystem — if the device is stolen in this state, stored data can be extracted.
 
+**Hidden Space.** If Hidden Space is configured, the device key file holds two independent encrypted slots — one per space. Each slot is protected by its own PIN. Disabling the startup PIN wipes the hidden space automatically before removing PIN protection, since PIN entry is the only mechanism for space selection. Factory reset wipes both spaces by formatting the entire filesystem.
+
 Factory reset (RST + immediate double button hold) wipes all data including keys, passwords, WiFi credentials, sessions, and PIN. There is no recovery after a factory reset without a prior export backup.
 
 ---
@@ -65,6 +67,8 @@ Factory reset (RST + immediate double button hold) wipes all data including keys
 **No secure boot** — the firmware is not signed. A malicious firmware image could be flashed without detection. Verify firmware source before flashing.
 
 **No tamper detection** — the hardware has no mechanism to detect physical tampering.
+
+**Hidden Space detection from Space A.** The holder of Space A's device key can derive the sentinel file path and confirm Space B exists by checking filesystem for that path. Space B data contents remain inaccessible without Space B's PIN.
 
 ---
 
@@ -84,7 +88,7 @@ If you find a security issue, please report it privately via GitHub before publi
 - CTR_DRBG — random number generation (NIST SP 800-90A)
 - RFC 6238 — TOTP (Time-Based One-Time Password)
 - RFC 4226 — HOTP (HMAC-Based One-Time Password)
-- RFC 2104 — HMAC
+- RFC 2104 — HMAC (also: Space B path derivation via HMAC-SHA256)
 
 
 Compatible authenticator apps: Google Authenticator, Microsoft Authenticator, Authy, 1Password, and any RFC 6238/4226 compliant app.
@@ -102,6 +106,8 @@ Compatible authenticator apps: Google Authenticator, Microsoft Authenticator, Au
 **Reset sessions on every reboot.** In Settings, configure session duration to "until reboot". This ensures no session survives a power cycle, reducing the window for session hijacking.
 
 **Make regular encrypted backups.** Use the export function to save an encrypted backup. Store it in a safe place — it is the only way to recover your data after a factory reset or hardware failure.
+
+**Use Hidden Space for plausible deniability.** If required by your threat model, configure a second encrypted vault (Settings → Hidden Space in the web cabinet). The alternate PIN loads a fully isolated set of keys and passwords. Space B file paths are HMAC-derived and indistinguishable from random data without the device key. Note: Hidden Space requires startup PIN to remain active — disabling PIN destroys the hidden vault.
 
 **Use strong credentials.** The web admin password and PIN are your primary defense. Longer credentials increase brute-force time exponentially regardless of PBKDF2 iteration count.
 

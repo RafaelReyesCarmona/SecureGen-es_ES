@@ -13,6 +13,7 @@ public:
   void end();
   bool isConnected();
   void sendPassword(const char* password);
+  void sendEnter();
 
 private:
   USBHIDKeyboard _keyboard;

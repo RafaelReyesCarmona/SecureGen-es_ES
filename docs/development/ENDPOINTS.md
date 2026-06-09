@@ -112,26 +112,58 @@ Returns password list metadata. Passwords are not included — use `/api/passwor
       "name": "Gmail",
       "category": "web",
       "strength": 2,
-      "pw_hash": "a1b2c3d4"
+      "pw_hash": "a1b2c3d4",
+      "auto_send": false
     }
   ]
 }
 ```
 
-Fields: `name` (string), `category` ("web"|"app"|"local"|"key"|""), `strength` (0–3), `pw_hash` (first 8 bytes of SHA-256, hex, for duplicate detection). Passwords are never included in the list response — use `/api/passwords/get`.
+| Field | Type | Description |
+|-------|------|-------------|
+| name | string | Password entry name |
+| category | string | Category: "web", "app", "local", "key", or "" |
+| strength | int | Password strength: 0=unknown, 1=weak, 2=medium, 3=strong |
+| pw_hash | string | First 8 bytes of SHA-256 (hex) for duplicate detection |
+| auto_send | bool | Whether Enter is sent after password output |
+
+Passwords are never included in the list response — use `/api/passwords/get`.
 
 ### POST /api/passwords/add 🔐 🛡️ 🔒
-Request: `{ "name": "...", "password": "...", "category": "web" }`
+Request: `{ "name": "...", "password": "...", "category": "web", "auto_send": false }`
 
-Note: `category` optional — omit or pass "" for no category.
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| name | string | required | Password entry name |
+| password | string | required | Password value |
+| category | string | "" | Category: "web", "app", "local", "key", or "" |
+| auto_send | bool | false | Automatically press Enter after HID output |
+
+Note: `category` and `auto_send` are optional.
 
 ### POST /api/passwords/get 🔐 🛡️ 🔒
 Returns the plaintext password for one entry.  
 Request: `{ "index": 0 }`  
-Response: `{ "success": true, "password": "..." }`
+Response: `{ "success": true, "password": "...", "name": "...", "category": "web", "auto_send": false }`
+
+| Response Field | Type | Description |
+|----------------|------|-------------|
+| success | bool | Operation status |
+| password | string | Plaintext password value |
+| name | string | Password entry name |
+| category | string | Category: "web", "app", "local", "key", or "" |
+| auto_send | bool | Whether Enter is sent after password output |
 
 ### POST /api/passwords/update 🔐 🛡️ 🔒
-Request: `{ "index": 0, "name": "...", "password": "...", "category": "web" }`
+Request: `{ "index": 0, "name": "...", "password": "...", "category": "web", "auto_send": false }`
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| index | int | required | Password entry index |
+| name | string | required | Password entry name |
+| password | string | required | Password value |
+| category | string | "" | Category: "web", "app", "local", "key", or "" |
+| auto_send | bool | false | Automatically press Enter after HID output |
 
 ### POST /api/passwords/delete 🔐 🛡️ 🔒
 Request: `{ "index": 0 }`
@@ -315,6 +347,80 @@ Response 500: `{ "success": false, "message": "Failed to save WiFi credentials" 
 
 ### POST /api/change_ap_password 🔐 🛡️ 🔒
 Request: `{ "new_password": "..." }`
+
+---
+
+## Hidden Space 
+
+### GET /api/hidden_space 🔐 🔒 
+
+Returns current hidden space status. Response differs by active space. 
+
+**Space A response:** 
+```json 
+{ 
+  "hidden_space_enabled": true, 
+  "current_space": "A", 
+  "can_enable": true, 
+  "can_disable": true, 
+  "share_wifi": false 
+} 
+``` 
+
+**Space B response:** 
+```json 
+{ 
+  "hidden_space_enabled": true, 
+  "current_space": "B", 
+  "can_enable": false, 
+  "can_disable": true, 
+  "share_wifi": false 
+} 
+``` 
+
+`hidden_space_enabled` reflects whether Space B is provisioned (sentinel 
+file detected). `share_wifi` is only meaningful in Space A context. 
+
+### POST /api/hidden_space 🔐 🛡 🔒 
+
+Manages hidden space lifecycle. All actions require Space A context except 
+`disable` (which requires Space B context). 
+
+**Action: enable** 
+Writes `/.setup_hidden_space` trigger file and restarts the device. 
+On next boot, PIN entry flow creates Space B slot. 
+
+```json 
+{ "action": "enable" } 
+``` 
+
+**Action: disable** 
+Wipes Space B: overwrites slot B with random bytes, deletes all 
+HMAC-derived data files, removes sentinel and shared cache. 
+Must be called from Space B context. 
+
+```json 
+{ "action": "disable" } 
+``` 
+
+**Action: set_share_wifi** 
+Copies Space A WiFi credentials re-encrypted with chip-derived key to 
+`/.conn_cache`. Space B WifiManager uses this file as fallback if its own 
+credentials are absent. Calling with `enabled: false` removes the cache file. 
+Space A context only. 
+
+```json 
+{ "action": "set_share_wifi", "enabled": true } 
+``` 
+
+Response (all actions on success): 
+```json 
+{ "status": "ok" } 
+``` 
+
+> **Registration:** this endpoint follows the 6-location checklist 
+> (direct handler, two tunnel dispatchers, obfuscation manager, 
+> `shouldTunnelEndpoint`, `shouldSecureEndpoint`).
 
 ---
 

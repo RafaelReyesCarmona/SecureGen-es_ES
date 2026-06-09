@@ -396,6 +396,7 @@
       <a href="#passwords" class="nav-link">Passwords</a>
       <a href="#display" class="nav-link">Display</a>
       <a href="#pin" class="nav-link">PIN Settings</a>
+      <a href="#hidden-space" class="nav-link">Hidden Space</a>
       <a href="#settings" class="nav-link">Settings</a>
     </div>
   </nav>
@@ -760,6 +761,10 @@
       </ul>
       <p>Use the category filter bar above the password table to show only entries from a selected category. Click <strong>📋 All</strong> to show everything.</p>
 
+      <h4>Auto-Send (Enter)</h4>
+      <p>When enabled, the device automatically presses <kbd>Enter</kbd> after typing the password via BLE or USB HID keyboard. Useful for login forms where the password field is the last input. Enable only when the target application expects Enter to submit — in other contexts it may trigger unintended actions.</p>
+      <p>The badge <code>ENT</code> appears on the device screen when a password has Auto-Send enabled.</p>
+
       <h3>Password Actions</h3>
       <div class="table-wrap">
         <table>
@@ -899,6 +904,61 @@
         <strong>⚠ Warning — irreversible</strong><br>
         There is no confirmation prompt. Entry of the Duress PIN immediately and permanently destroys all data. Use only in situations where device compromise is imminent and you must prevent data extraction.
       </div>
+    </div>
+
+    <div class="section" id="hidden-space"> 
+      <div class="section-header"> 
+        <h2>Hidden Space</h2> 
+      </div> 
+      <p>Hidden Space is a second independent encrypted vault. At boot, entering an alternate PIN loads a completely separate set of keys, passwords, and web cabinet account. The device behaves identically from the outside regardless of which space is active.</p> 
+ 
+      <h3>How it works</h3> 
+      <p>The device key file holds two independent encrypted slots. Each slot is protected by its own PIN and salt. The slot that successfully decrypts determines which space loads — the other slot is never touched during that session.</p> 
+ 
+      <div class="callout callout-info"> 
+        Hidden Space requires startup PIN to be active. If startup PIN is disabled, Hidden Space is automatically wiped — PIN entry is the only mechanism for space selection. 
+      </div> 
+ 
+      <h3>Step 1 — Enable Hidden Space</h3> 
+      <p>Open the web cabinet from Space A → <strong>Settings → Hidden Space</strong> → enable the toggle → confirm. The device restarts.</p> 
+ 
+      <h3>Step 2 — Set a Space B PIN</h3> 
+      <p>On the next boot you are prompted for your main PIN first (Space A unlock), then a new PIN for Space B. The two PINs must be different. After setup the device restarts again and boots normally into Space A.</p> 
+ 
+      <h3>Entering Space B</h3> 
+      <p>At the PIN entry screen, enter the Space B PIN instead of the Space A PIN. The device loads the hidden vault — isolated TOTP keys, passwords, and a fresh web cabinet registration.</p> 
+ 
+      <div class="table-wrap"> 
+        <table> 
+          <thead><tr><th>Data / Setting</th><th>Space A</th><th>Space B</th><th>Shared</th></tr></thead> 
+          <tbody> 
+            <tr><td>TOTP / HOTP keys</td><td>✅ own</td><td>✅ own</td><td>—</td></tr> 
+            <tr><td>Passwords</td><td>✅ own</td><td>✅ own</td><td>—</td></tr> 
+            <tr><td>Web cabinet account</td><td>✅ own</td><td>✅ own</td><td>—</td></tr> 
+            <tr><td>WiFi credentials</td><td>✅ own</td><td>✅ own (or shared)</td><td>optional</td></tr> 
+            <tr><td>BLE PIN</td><td>✅ own</td><td>✅ own</td><td>—</td></tr> 
+            <tr><td>Display theme</td><td>—</td><td>—</td><td>✅</td></tr> 
+            <tr><td>BLE device name</td><td>—</td><td>—</td><td>✅</td></tr> 
+            <tr><td>RTC / time sync</td><td>—</td><td>—</td><td>✅</td></tr> 
+          </tbody> 
+        </table> 
+      </div> 
+ 
+      <h3>WiFi sharing</h3> 
+      <p>By default Space B has no WiFi credentials. In <strong>Settings → Hidden Space</strong> (Space A context), enable <em>Share WiFi with hidden space</em> to let Space B use Space A's WiFi on its first boot. Credentials are re-encrypted with a chip-derived key — neither space can read the other's device key.</p> 
+ 
+      <h3>Disabling Hidden Space</h3> 
+      <p>From Space B: <strong>Settings → Hidden Space</strong> → disable toggle → confirm. This wipes slot B and deletes all Space B files. Space A data is not affected.</p> 
+ 
+      <div class="callout callout-info"> 
+        Wipe is permanent and cannot be undone. All Space B keys, passwords, and credentials are destroyed. 
+      </div> 
+ 
+      <h3>Factory reset and Hidden Space</h3> 
+      <p>Factory reset is only available from Space A. A full factory reset wipes both spaces by formatting the filesystem entirely. Factory reset from Space B is blocked.</p> 
+ 
+      <h3>First boot into Space B</h3> 
+      <p>Space B starts empty — no keys, no passwords, no web cabinet account. Register a new web cabinet account on first access. If WiFi sharing is not enabled, configure WiFi credentials in the web cabinet as well.</p> 
     </div>
 
     <!-- SETTINGS -->

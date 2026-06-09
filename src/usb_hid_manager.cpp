@@ -27,6 +27,12 @@ void UsbHidManager::sendPassword(const char* password) {
   _keyboard.print(String(password));
 }
 
+void UsbHidManager::sendEnter() {
+  if (!_started) return;
+  _keyboard.write(KEY_RETURN);
+  delay(50);
+}
+
 uint8_t UsbHidManager::charToHidKey(char c) {
   if (c >= 'a' && c <= 'z') return c - 'a' + 0x04;
   if (c >= 'A' && c <= 'Z') return c - 'A' + 0x04;

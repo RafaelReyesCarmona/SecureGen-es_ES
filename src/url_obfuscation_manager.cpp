@@ -68,6 +68,7 @@ bool URLObfuscationManager::begin() {
     registerCriticalEndpoint("/api/battery", "battery_status");
     registerCriticalEndpoint("/api/boot-mode", "Boot Mode Selection");
     registerCriticalEndpoint("/api/hid-mode", "HID Mode Selection (BLE/USB)");
+    registerCriticalEndpoint("/api/hidden_space", "Hidden Space Management");
     registerCriticalEndpoint("/api/duress_pin_update", "duress_pin_update");
     registerCriticalEndpoint("/api/ble_pin_update", "BLE PIN Update");
     registerCriticalEndpoint("/api/clear_ble_clients", "Clear BLE Clients");

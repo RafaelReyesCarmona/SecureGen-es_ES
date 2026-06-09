@@ -1,6 +1,6 @@
 #pragma once
 
-const char wifi_setup_html[] PROGMEM = R"rawliteral(
+const char wifi_setup_html_part1[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -399,7 +399,9 @@ const char wifi_setup_html[] PROGMEM = R"rawliteral(
                 clearInterval(searchInterval);
                 showStatus('🚀 Device ready! Redirecting to registration page in 2 seconds...');
                 setTimeout(() => {
-                    window.location.href = 'http://##MDNS_HOSTNAME##.local/';
+                    window.location.href = 'http://)rawliteral";
+
+const char wifi_setup_html_part2[] PROGMEM = R"rawliteral(.local/';
                 }, 2000);
                 return;
             }

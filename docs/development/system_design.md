@@ -45,7 +45,7 @@ Platform
 
 | Manager | Responsibility |
 |---------|---------------|
-| `CryptoManager` | Device key, PBKDF2, AES, RNG, session storage |
+| `CryptoManager` | Device key, PBKDF2, AES, RNG, session storage, dual-slot space management, HMAC-derived file paths |
 | `SecureLayerManager` | ECDH key exchange, AES-256-GCM transport encryption |
 | `KeyManager` | TOTP/HOTP key storage and code generation |
 | `PasswordManager` | Password storage and retrieval |
@@ -89,12 +89,18 @@ If LittleFS mount fails: device halts with error screen.
 7. `CryptoManager::begin()` — initializes mbedTLS CTR_DRBG with hardware entropy
 
 **Device key path branches:**
-
-```
-/device.key missing  →  First boot: PIN creation + key generation
-/device.key exists, encrypted  →  Normal boot: PIN entry
-/device.key exists, unencrypted  →  Legacy: key loaded without PIN
-```
+/device.key missing          →  First boot: PIN creation + key generation 
+/device.key exists (81 b)    →  Normal boot: PIN entry → slot A unlock → Space A 
+ alternate PIN → slot B unlock → Space B 
+/device.key exists (≤33 b)   →  Legacy: key loaded without PIN (no space selection) 
+ 
+ **Hidden Space boot path (normal boot):** 
+ - File size = 161 bytes → dual-slot file present 
+ - Try entered PIN against slot A (offset 0): PBKDF2 + AES-CBC + MAGIC check 
+ - If slot A decrypts → Space A loads, Space B slot untouched 
+ - If slot A fails → try same PIN against slot B (offset 81) 
+ - If slot B decrypts → Space B loads, Space A slot untouched 
+ - If both fail → increment `/.pin_attempts` counter
 
 **First boot (PIN creation):**
 - User selects PIN length (4–10 digits)

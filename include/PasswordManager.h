@@ -12,7 +12,8 @@ struct PasswordEntry {
     int order = 0;  // Порядок сортировки
     uint8_t strength = 0;   // 0=unknown, 1=weak, 2=medium, 3=strong
     String pw_hash = "";    // SHA256 first 8 bytes as hex (16 chars), for duplicate detection
-    String category = "";   // "web" | "app" | "local" | "key" | "" (means all)
+    String  category  = "";   // "web"|"app"|"local"|"key"|""
+    bool    auto_send = false; // type Enter after typing password via HID
 };
 
 class PasswordManager {
@@ -23,9 +24,9 @@ public:
     String  computePwHash(const String& password);
     uint32_t getRevision() const { return _revision; }
     
-    bool addPassword(const String& name, const String& password, const String& category = "");
+    bool addPassword(const String& name, const String& password, const String& category = "", bool auto_send = false);
     bool deletePassword(int index);
-    bool updatePassword(int index, const String& name, const String& password, const String& category = ""); // <-- ADDED
+    bool updatePassword(int index, const String& name, const String& password, const String& category = "", bool auto_send = false); // <-- ADDED auto_send
     bool reorderPasswords(const std::vector<std::pair<String, int>>& newOrder); // Изменение порядка
     std::vector<PasswordEntry> getAllPasswords();
     std::vector<PasswordEntry> getAllPasswordsForExport();

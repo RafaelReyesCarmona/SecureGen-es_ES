@@ -405,6 +405,14 @@ void BleKeyboardManager::sendPassword(const char* password) {
     print(String(password));
 }
 
+void BleKeyboardManager::sendEnter() {
+    if (!isConnected()) return;
+    press(0x28); // 0x28 is HID code for Enter
+    delay(50);
+    release();
+    delay(50);
+}
+
 uint8_t BleKeyboardManager::charToHidKey(char c) {
     // Буквы
     if (c >= 'a' && c <= 'z') return c - 'a' + 0x04;

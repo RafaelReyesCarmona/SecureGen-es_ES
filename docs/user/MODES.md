@@ -97,6 +97,61 @@ The selected default is stored persistently in device config. After factory rese
 
 ---
 
+## Space Selection at Boot 
+
+If Hidden Space is configured, boot adds a prior step before network mode 
+selection: the PIN entry determines which space loads. 
+
+| PIN entered | Result | 
+|-------------|--------| 
+| Space A PIN | Primary vault — all Space A data, full web cabinet | 
+| Space B PIN | Hidden vault — isolated Space B data, separate web cabinet | 
+| Wrong PIN (5× total across reboots) | Factory reset | 
+
+Space selection is invisible from the outside — the device shows the same 
+PIN entry screen regardless of which space is configured. An observer cannot 
+determine how many spaces exist or which PIN was entered. 
+
+**Space B characteristics at first boot:** 
+- No TOTP keys, no passwords, no WiFi credentials (unless WiFi sharing enabled) 
+- Web cabinet requires fresh registration 
+- BLE PIN disabled by default 
+- Network mode selection and display mode work identically to Space A 
+
+**Constraints:** 
+- Hidden Space requires startup PIN to be active. Disabling startup PIN 
+  automatically wipes Space B (confirmed via web cabinet warning). 
+- Factory reset can only be initiated from Space A. 
+- RTC module config and time sync are shared — both spaces benefit equally 
+  from a connected DS3231. 
+
+### Feature Matrix — Per-Space Isolation 
+
+| Data / Setting | Space A | Space B | Shared | 
+|----------------|---------|---------|--------| 
+| TOTP / HOTP keys | ✅ own | ✅ own | — | 
+| Passwords | ✅ own | ✅ own | — | 
+| Web cabinet account | ✅ own | ✅ own | — | 
+| WiFi credentials | ✅ own | ✅ own (or shared) | optional | 
+| BLE PIN | ✅ own | ✅ own | — | 
+| Device BLE PIN | ✅ own | ✅ own | — | 
+| Duress PIN | ✅ own | ✅ own | — | 
+| Display theme | ✅ own | ✅ own | — | 
+| Startup mode | ✅ own | ✅ own | — | 
+| HID mode (BLE/USB) | ✅ own | ✅ own | — | 
+| BLE device name | — | — | ✅ | 
+| mDNS hostname | — | — | ✅ | 
+| Boot mode | — | — | ✅ | 
+| RTC configuration | — | — | ✅ | 
+| Display settings | — | — | ✅ | 
+| Web server timeout | — | — | ✅ | 
+| Session duration | — | — | ✅ | 
+| AP password | — | — | ✅ |
+
+**Note:** Space B web cabinet hides all shared (global) device settings. Only Space A can modify boot mode, RTC, display settings, web server timeout, session duration, AP password, BLE device name, and mDNS hostname.
+
+---
+
 ### Display Mode (Startup Mode)
 
 The device can be configured to open either TOTP Authenticator or Password Manager by default after PIN unlock.

@@ -12,6 +12,10 @@ UsbHidManager usbHidManager;
 #include "config.h"
 #include "config_manager.h"
 #include "crypto_manager.h"
+#include "secure_utils.h"
+#include "mbedtls/aes.h"
+#include "mbedtls/md.h"
+#include "mbedtls/pkcs5.h"
 #include "display_manager.h"
 // esp_sleep.h removed — pseudo-sleep uses polling loop, no esp_sleep_* calls needed
 #include "log_manager.h"
@@ -98,7 +102,8 @@ void performDuressWipe() {
         "/config.json", "/device.key", "/ble_config.json", "/.webadmin",
         "/mdns_config.json", "/.login_state", "/rtc_config.json",
         "/ble_pin.json.enc", "/device_ble_pin.json.enc", "/session.json.enc",
-        "/duress_pin.hash", "/boot_counter.txt", "/.pin_attempts", nullptr
+        "/duress_pin.hash", "/boot_counter.txt", "/.pin_attempts", 
+        "/theme_pref.json", "/startup_pref.json", "/hid_mode.json", "/boot_mode.json", nullptr
     };
     for (int i = 0; files[i]; i++) LittleFS.remove(files[i]);
     fs::File root = LittleFS.open("/", "r");
@@ -178,6 +183,211 @@ void savePinAttempts(int count) {
 
 void clearPinAttempts() { LittleFS.remove(PIN_ATTEMPTS_FILE); }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// HIDDEN SPACE SETUP FLOW
+// ═══════════════════════════════════════════════════════════════════════════
+
+void runHiddenSpaceSetupFlow() {
+  LOG_INFO("Main", "Starting secondary slot setup flow");
+  
+  // Load PIN length preference before any PIN entry
+  // pinManager.begin() is not called yet, but loadPinConfig() alone
+  // is sufficient to read /.sys_ui_prefs
+  pinManager.loadPinConfig();
+  int pinLen = pinManager.getPinLength();
+  LOG_INFO("Main", ("Secondary slot setup: using PIN length " + String(pinLen) + " from primary context").c_str());
+  
+  displayManager.init();
+  displayManager.showMessage("Hidden Space Setup", 10, 20, true, 2);
+  delay(2000);
+  
+  // Step 1: Authenticate with Space A PIN first
+  displayManager.init();
+  displayManager.showMessage("Hidden Space Setup", 10, 20, true, 2);
+  displayManager.showMessage("Enter main PIN", 10, 50, false, 1);
+  displayManager.showMessage("to confirm", 10, 65, false, 1);
+  delay(1500);
+  
+  String spaceAPin = pinManager.requestPinInput("Main PIN", false);
+  
+  if (spaceAPin.isEmpty()) {
+    LOG_WARNING("Main", "Space A PIN entry cancelled");
+    displayManager.init();
+    displayManager.showMessage("Setup Cancelled", 10, 30, true, 2);
+    delay(2000);
+    ESP.restart();
+    return;
+  }
+  
+  if (!CryptoManager::getInstance().unlockDeviceKeyWithPin(spaceAPin)) {
+    LOG_ERROR("Main", "Primary context unlock failed in secondary slot setup");
+    displayManager.init();
+    displayManager.showMessage("Wrong PIN", 10, 30, true, 2);
+    delay(2000);
+    ESP.restart();
+    return;
+  }
+  
+  LOG_INFO("Main", "Space A unlocked, active space: A");
+  // Now _activeSpace == ActiveSpace::A → createHiddenSpace() will succeed
+  
+  // Load PIN length from existing configuration (inherited from Space A)
+  int pinLength = pinManager.getPinLength();
+  LOG_INFO("Main", "Using PIN length from Space A: " + String(pinLength));
+  
+  bool setupComplete = false;
+  
+  while (!setupComplete) {
+    // Request new PIN for hidden space
+    displayManager.init();
+    displayManager.showMessage("New Space PIN", 10, 20, true, 2);
+    displayManager.showMessage("Must differ from", 10, 50, false, 1);
+    displayManager.showMessage("main PIN", 10, 65, false, 1);
+    delay(2000);
+    
+    // Request PIN entry using existing method
+    String newPin = pinManager.requestPinInput("New Space PIN", false);
+    
+    if (newPin.isEmpty()) {
+      // User cancelled
+      displayManager.init();
+      displayManager.showMessage("Setup Cancelled", 10, 30, true, 2);
+      delay(2000);
+      ESP.restart();
+      return;
+    }
+    
+    // Confirm PIN
+    String confirmPin = pinManager.requestPinInput("Confirm PIN", true);
+    
+    if (confirmPin != newPin) {
+      displayManager.init();
+      displayManager.showMessage("PINs Don't Match", 10, 30, true, 2);
+      delay(2000);
+      continue; // Try again
+    }
+    
+    // Verify new PIN != Space A PIN by attempting to decrypt slot A
+    LOG_INFO("Main", "Verifying new PIN differs from Space A PIN");
+    
+    // We need to check if this PIN can decrypt slot A
+    // Use a temporary check via tryDecryptSlot
+    CryptoManager& crypto = CryptoManager::getInstance();
+    
+    // Open device.key and try to decrypt slot A with the new PIN
+    fs::File keyFile = LittleFS.open(DEVICE_KEY_FILE, "r");
+    if (!keyFile) {
+      LOG_ERROR("Main", "Failed to open device.key for PIN verification");
+      displayManager.init();
+      displayManager.showMessage("Setup Failed", 10, 30, true, 2);
+      displayManager.showMessage("Cannot read key file", 10, 60, false, 1);
+      delay(2000);
+      continue;
+    }
+    
+    size_t fileSize = keyFile.size();
+    keyFile.close();
+    
+    bool pinMatchesSpaceA = false;
+    
+    if (fileSize == 256) {
+      // Dual-slot format - try to decrypt slot A
+      // We'll use a simple PBKDF2 + AES check without modifying crypto state
+      uint8_t salt[16], iv[16], encrypted[48];
+      
+      keyFile = LittleFS.open(DEVICE_KEY_FILE, "r");
+      keyFile.seek(0); // SLOT_A_OFFSET = 0
+      keyFile.read(salt, 16);
+      keyFile.read(iv, 16);
+      keyFile.read(encrypted, 48);
+      keyFile.close();
+      
+      // Derive key from new PIN
+      uint8_t derived_key[32];
+      mbedtls_md_context_t sha256_ctx;
+      mbedtls_md_init(&sha256_ctx);
+      mbedtls_md_setup(&sha256_ctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), 1);
+      
+      int ret = mbedtls_pkcs5_pbkdf2_hmac(
+          &sha256_ctx,
+          (const unsigned char*)newPin.c_str(), newPin.length(),
+          salt, 16,
+          PBKDF2_ITERATIONS_PIN,
+          32,
+          derived_key
+      );
+      
+      mbedtls_md_free(&sha256_ctx);
+      
+      if (ret == 0) {
+        // Decrypt and check MAGIC
+        uint8_t iv_copy[16];
+        memcpy(iv_copy, iv, 16);
+        
+        uint8_t plaintext[48];
+        mbedtls_aes_context aes;
+        mbedtls_aes_init(&aes);
+        mbedtls_aes_setkey_dec(&aes, derived_key, 256);
+        mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_DECRYPT, 48, iv_copy, encrypted, plaintext);
+        mbedtls_aes_free(&aes);
+        
+        // Check MAGIC bytes
+        const uint8_t MAGIC[4] = {0xA3, 0x7F, 0x2C, 0x91};
+        if (memcmp(plaintext, MAGIC, 4) == 0) {
+          pinMatchesSpaceA = true;
+        }
+        
+        // Secure cleanup
+        secure_memzero(derived_key, sizeof(derived_key));
+        secure_memzero(plaintext, sizeof(plaintext));
+      }
+    }
+    
+    if (pinMatchesSpaceA) {
+      LOG_WARNING("Main", "New PIN matches Space A PIN - rejecting");
+      displayManager.init();
+      displayManager.showMessage("PIN Error!", 10, 30, true, 2);
+      displayManager.showMessage("Must differ from", 10, 60, false, 1);
+      displayManager.showMessage("main PIN", 10, 75, false, 1);
+      delay(2500);
+      continue; // Loop back to request new PIN
+    }
+    
+    // ═══ DURESS PIN COLLISION CHECK ═══
+    // Reject if Space B PIN matches duress PIN
+    // This prevents a scenario where entering Space B PIN triggers duress wipe
+    if (crypto.isDuressPinConfigured() && crypto.verifyDuressPin(newPin)) {
+      LOG_WARNING("Main", "New Space B PIN matches duress PIN - rejecting");
+      displayManager.init();
+      displayManager.showMessage("PIN Error!", 10, 30, true, 2);
+      displayManager.showMessage("Matches duress PIN", 10, 60, false, 1);
+      displayManager.showMessage("Choose different", 10, 75, false, 1);
+      delay(2500);
+      continue; // Loop back to request new PIN
+    }
+    
+    // PIN is different - proceed with secondary slot creation
+    LOG_INFO("Main", "Creating secondary slot with new PIN");
+    
+    if (crypto.createHiddenSpace(newPin)) {
+      LOG_INFO("Main", "Secondary slot created successfully");
+      displayManager.init();
+      displayManager.showMessage("Secondary Slot Ready", 10, 30, true, 2);
+      displayManager.showMessage("Rebooting...", 10, 60, false, 1);
+      delay(2000);
+      ESP.restart();
+      return; // Never reached
+    } else {
+      LOG_ERROR("Main", "Failed to create secondary slot");
+      displayManager.init();
+      displayManager.showMessage("Setup Failed", 10, 30, true, 2);
+      displayManager.showMessage("Try again", 10, 60, false, 1);
+      delay(2000);
+      // Loop back to try again
+    }
+  }
+}
+
 // Глобальные переменные состояния
 static AppMode currentMode = AppMode::TOTP;
 static int currentKeyIndex = 0;
@@ -196,6 +406,8 @@ static const uint8_t DIM_BRIGHTNESS = 51; // 20% of 255
 
 unsigned long bothButtonsPressStartTime = 0;
 bool bleActionTriggered = false;
+bool autoSendTriggered = false; // Автоматическая отправка пароля
+bool autoSendDone = false;      // Флаг завершения автоотправки в текущей сессии
 static bool hotpSavePending = false;
 static int hotpSaveIndex = -1;
 
@@ -310,6 +522,11 @@ void handleFactoryResetOnBoot() {
       LittleFS.remove("/device_ble_pin.json.enc"); // <-- СБРОС Device BLE PIN
       LittleFS.remove("/duress_pin.hash"); // <-- СБРОС Duress PIN
       LittleFS.remove("/session.json.enc"); // <-- СБРОС СЕССИЙ И CSRF
+      LittleFS.remove("/theme_pref.json"); // <-- СБРОС THEME PREF
+      LittleFS.remove("/startup_pref.json"); // <-- СБРОС STARTUP PREF
+      LittleFS.remove("/hid_mode.json"); // <-- СБРОС HID MODE PREF
+      LittleFS.remove("/boot_mode.json"); // <-- СБРОС BOOT MODE PREF
+      LittleFS.remove("/.setup_hidden_space"); // <-- СБРОС Hidden Space Setup Flag
 
       // 🔗 URL Obfuscation: Удаление boot counter и всех mappings
       LOG_INFO("Main", "Clearing URL obfuscation data...");
@@ -340,6 +557,19 @@ void handleFactoryResetOnBoot() {
       // Дополнительная очистка NVS BLE раздела
       nvs_flash_erase_partition("nvs");
       LOG_INFO("Main", "NVS partition cleared");
+      
+      // ═══ FORMAT LITTLEFS TO REMOVE ALL ORPHANED FILES ═══
+      // This ensures Space B files (with HMAC-derived names) are completely removed
+      // since we don't know the Space B device key to derive their paths
+      LOG_INFO("Main", "Formatting LittleFS to ensure complete wipe...");
+      LittleFS.end();
+      LittleFS.format();
+      LittleFS.begin(false);
+      LOG_INFO("Main", "LittleFS formatted - all files removed");
+      
+      // ═══ SECURE MEMORY ZEROING ═══
+      LOG_INFO("Main", "Wiping device key from memory...");
+      CryptoManager::getInstance().wipeDeviceKey();
 
       displayManager.showMessage("Done. Rebooting...", 10, 60);
 
@@ -403,6 +633,14 @@ void setup() {
   LOG_INFO("Main", "Loading display rotation for button helpers...");
   g_displayRotation = configManager.getDisplayRotation();
   LOG_INFO("Main", "Display rotation loaded: " + String(g_displayRotation));
+
+  // ═══ CHECK FOR SECONDARY SLOT SETUP FLAG ═══
+  if (LittleFS.exists("/.setup_hidden_space")) {
+    LOG_INFO("Main", "Secondary slot setup flag detected - starting setup flow");
+    LittleFS.remove("/.setup_hidden_space");
+    runHiddenSpaceSetupFlow();
+    // runHiddenSpaceSetupFlow() does not return — it reboots on completion
+  }
 
   LOG_INFO("Main", "Initializing Crypto Manager...");
   CryptoManager::getInstance().begin();
@@ -501,6 +739,13 @@ void setup() {
     // PIN correct — clear counter
     clearPinAttempts();
     LOG_INFO("Main", "Device unlocked successfully with PIN");
+    
+    // ═══ SPACE CONTEXT LOGGING ═══
+    // Space context is already set inside CryptoManager::unlockDeviceKeyWithPin()
+    // via initSpacePaths(). Log active space for debugging:
+    ActiveSpace activeSpace = CryptoManager::getInstance().getActiveSpace();
+    LOG_INFO("BOOT", "Active space: " + String(activeSpace == ActiveSpace::A ? "A" : 
+                                                activeSpace == ActiveSpace::B ? "B" : "NONE"));
 
   } else {
     // LEGACY: device.key существует но не зашифрован (старый формат)
@@ -538,7 +783,35 @@ void setup() {
   WebAdminManager::getInstance().begin();
 
   LOG_INFO("Main", "Loading theme...");
-  Theme savedTheme = configManager.loadTheme();
+  Theme savedTheme;
+  
+  // Try per-space theme file first
+  String themePath = CryptoManager::getInstance().getSpacePath("theme");
+  if (LittleFS.exists(themePath)) {
+      fs::File tf = LittleFS.open(themePath, "r");
+      if (tf) {
+          JsonDocument tdoc;
+          if (deserializeJson(tdoc, tf) == DeserializationError::Ok) {
+              String themeStr = tdoc["theme"] | "";
+              if      (themeStr == "dark")  savedTheme = Theme::DARK;
+              else if (themeStr == "light") savedTheme = Theme::LIGHT;
+              else                          savedTheme = configManager.loadTheme();
+          } else {
+              savedTheme = configManager.loadTheme();
+          }
+          tf.close();
+      } else {
+          savedTheme = configManager.loadTheme();
+      }
+  } else {
+      // First boot into this space — use default per space
+      if (CryptoManager::getInstance().getActiveSpace() == ActiveSpace::B) {
+          savedTheme = Theme::DARK;  // Space B default — never inherit from Space A
+      } else {
+          savedTheme = configManager.loadTheme();  // Space A uses global config
+      }
+  }
+  
   displayManager.setTheme(savedTheme);
 
   LOG_INFO("Main", "Loading BLE device name...");
@@ -553,9 +826,36 @@ void setup() {
   webServerManager.setWifiManager(&wifiManager);
   webServerManager.setBatteryManager(&batteryManager);
 
-  String startupMode = configManager.getStartupMode();
+  String startupMode;
+  
+  // Try per-space startup mode file first
+  String startupPath = CryptoManager::getInstance().getSpacePath("startup_mode");
+  if (LittleFS.exists(startupPath)) {
+      fs::File sf = LittleFS.open(startupPath, "r");
+      if (sf) {
+          JsonDocument sdoc;
+          if (deserializeJson(sdoc, sf) == DeserializationError::Ok) {
+              startupMode = sdoc["mode"] | "";
+              if (startupMode.length() == 0) {
+                  startupMode = configManager.getStartupMode();
+              }
+          } else {
+              startupMode = configManager.getStartupMode();
+          }
+          sf.close();
+      } else {
+          startupMode = configManager.getStartupMode();
+      }
+  } else {
+      // Default per space: Space A → from global config,
+      // Space B → passwords (often used as real vault)
+      bool isSpaceB = (CryptoManager::getInstance().getActiveSpace()
+                       == ActiveSpace::B);
+      startupMode = isSpaceB ? "passwords" : configManager.getStartupMode();
+  }
+  
   LOG_INFO("Main", "Loaded startup mode: " + startupMode);
-  if (startupMode == "password") {
+  if (startupMode == "password" || startupMode == "passwords") {
     currentMode = AppMode::PASSWORD;
     LOG_INFO("Main", "Starting in Password Manager mode");
   } else {
@@ -581,7 +881,30 @@ void setup() {
 
   // 🌌 ПРОМПТИНГ ВЫБОРА РЕЖИМА (AP/Offline/WiFi)
   LOG_INFO("Main", "Prompting for startup mode...");
-  String savedBootMode = configManager.getBootMode();
+  
+  // Try per-space file first
+  String savedBootMode;
+  String bootPath = CryptoManager::getInstance().getSpacePath("boot_mode");
+  if (LittleFS.exists(bootPath)) {
+    fs::File bf = LittleFS.open(bootPath, "r");
+    if (bf) {
+      JsonDocument bdoc;
+      if (deserializeJson(bdoc, bf) == DeserializationError::Ok) {
+        savedBootMode = bdoc["mode"] | "";
+      }
+      bf.close();
+    }
+  }
+  
+  // Fallback: Space A uses global config, Space B defaults to "wifi"
+  if (savedBootMode.length() == 0) {
+    if (CryptoManager::getInstance().getActiveSpace() == ActiveSpace::B) {
+      savedBootMode = "wifi";  // Space B default
+    } else {
+      savedBootMode = configManager.getBootMode();  // Space A fallback to global config
+    }
+  }
+  
   StartupMode defaultBootMode = StartupMode::WIFI_MODE;
   if (savedBootMode == "ap") defaultBootMode = StartupMode::AP_MODE;
   else if (savedBootMode == "offline") defaultBootMode = StartupMode::OFFLINE_MODE;
@@ -1096,6 +1419,16 @@ void setup() {
   }
 }
 
+inline bool isInBlePipeline() {
+  bool inPipeline = currentMode == AppMode::BLE_ADVERTISING ||
+                    currentMode == AppMode::BLE_PIN_ENTRY ||
+                    currentMode == AppMode::BLE_CONFIRM_SEND;
+#ifdef BOARD_HAS_USB_HID
+  inPipeline = inPipeline || currentMode == AppMode::USB_HID_SEND;
+#endif
+  return inPipeline;
+}
+
 void handleButtons() {
   esp_task_wdt_reset();
   static unsigned long button1PressStartTime = 0;
@@ -1198,6 +1531,7 @@ void handleButtons() {
       bothButtonsPressStartTime = 0;
       suppressNextSinglePress = true;
       bleActionTriggered = false;
+      autoSendDone = false;
       previousPasswordIndex = -1;
 
       // Don't call hideLoader in TOTP mode - it clears the screen and wipes the
@@ -1234,11 +1568,10 @@ void handleButtons() {
     } else if (millis() - button1PressStartTime > powerOffHoldTime) {
       // Длительное нажатие: переключить режим
       LOG_INFO("Main", "Button 1 LONG PRESS: Switching modes...");
-      if (currentMode == AppMode::BLE_ADVERTISING ||
-          currentMode == AppMode::BLE_PIN_ENTRY ||
-          currentMode == AppMode::BLE_CONFIRM_SEND) {
+      if (isInBlePipeline()) {
         bleKeyboardManager.end();
         bleActionTriggered = false;
+        autoSendDone = false;
       }
       currentMode =
           (currentMode == AppMode::TOTP) ? AppMode::PASSWORD : AppMode::TOTP;
@@ -1531,6 +1864,23 @@ void loop() {
       displayManager.init();
       displayManager.showMessage("Disabling PIN...", 10, 30, false, 2);
 
+      // If secondary slot exists, wipe it before removing PIN protection
+      if (CryptoManager::getInstance().isHiddenSpaceProvisioned()) {
+        LOG_INFO("Main", "Disabling startup PIN: wiping secondary slot first");
+        displayManager.showMessage("Wiping secondary slot...", 10, 50, false, 1);
+        
+        if (!CryptoManager::getInstance().wipeHiddenSpace()) {
+          LOG_ERROR("Main", "Failed to wipe secondary slot before PIN removal");
+          displayManager.init();
+          displayManager.showMessage("ERROR!", 10, 30, true, 2);
+          displayManager.showMessage("Secondary slot wipe failed", 10, 60, false, 1);
+          delay(3000);
+          displayManager.init();
+          return;
+        }
+        LOG_INFO("Main", "Secondary slot wiped before PIN removal");
+      }
+
       if (CryptoManager::getInstance().disablePinEncryption(enteredPin)) {
         LOG_INFO("Main", "PIN protection disabled via device confirmation");
 
@@ -1631,6 +1981,7 @@ void loop() {
   uint32_t autoLockSecondsMain = configManager.getAutoLockTimeout();
   if (!webServerManager.isRunning() && screenTimeoutSeconds == 0 &&
       !bleKeyboardManager.isConnected() &&
+      !isInBlePipeline() &&
 #ifdef BOARD_HAS_USB_HID
       !usbHidManager.isConnected() &&
 #endif
@@ -1652,8 +2003,7 @@ void loop() {
   bool canApplyIdleEffect = !webServerManager.isRunning() &&
       isScreenOn &&
       !bleKeyboardManager.isConnected() &&
-      currentMode != AppMode::BLE_ADVERTISING &&
-      currentMode != AppMode::BLE_PIN_ENTRY &&
+      !isInBlePipeline() &&
 #ifdef BOARD_HAS_USB_HID
       !usbHidManager.isConnected() &&
 #endif
@@ -1675,17 +2025,18 @@ void loop() {
         "Screen timeout reached. Web server inactive. Entering pseudo-sleep.");
 
     // Отключаем BLE для безопасности, если он активен
-    if (currentMode == AppMode::BLE_ADVERTISING ||
-        currentMode == AppMode::BLE_PIN_ENTRY ||
-        currentMode == AppMode::BLE_CONFIRM_SEND) {
+    if (isInBlePipeline()) {
       LOG_INFO("Main", "Disabling BLE due to screen timeout for security");
       bleKeyboardManager.end();
       currentMode = AppMode::PASSWORD;
       bleActionTriggered = false;
+      autoSendDone = false;
     }
 
     // 1. Выключаем дисплей перед сном
-    displayManager.turnOff();
+    if (!isInBlePipeline()) {
+        displayManager.turnOff();
+    }
     isScreenOn = false;
 
     // 2. Pseudo-sleep: lower CPU frequency, poll buttons
@@ -1760,6 +2111,14 @@ void loop() {
       }
     }
   }
+
+  // Вне if (isScreenOn) — BLE_PIN_ENTRY требует экран принудительно 
+  if (currentMode == AppMode::BLE_PIN_ENTRY && !isScreenOn) { 
+      LOG_INFO("MAIN", "BLE_PIN_ENTRY: screen was off - forcing wakeup"); 
+      displayManager.turnOn(); 
+      isScreenOn = true; 
+      lastActivityTime = millis(); 
+  } 
 
   if (isScreenOn) {
     // Пропускаем обновления если активен лоадер или QR код
@@ -1938,7 +2297,8 @@ void loop() {
               curPwd.strength,
               isDup,
               isPin,
-              isName);
+              isName,
+              curPwd.auto_send);
           previousPasswordIndex = currentPasswordIndex;
         }
       } else {
@@ -1950,6 +2310,7 @@ void loop() {
       static bool bleInitialized = false;
       static bool devicePinChecked = false;
       static unsigned long bleStartTime = 0;
+      static bool connectionTimerRestarted = false;
 
       if (!bleInitialized) {
         LOG_INFO("Main", "Entering BLE_ADVERTISING setup");
@@ -1983,17 +2344,28 @@ void loop() {
             devicePinChecked = false;
           }
           bleStartTime = millis(); // Запоминаем время начала BLE режима
-          LOG_INFO("Main", "BLE Keyboard started. Waiting for connection...");
+        connectionTimerRestarted = false;
+        LOG_INFO("Main", "BLE Keyboard started. Waiting for connection...");
         }
       }
 
       if (bleKeyboardManager.isConnected()) {
+        // Сброс таймера ТОЛЬКО ОДИН РАЗ при подключении
+        if (currentMode == AppMode::BLE_ADVERTISING && !bleKeyboardManager.isSecure()) {
+          if (!connectionTimerRestarted) {
+            bleStartTime = millis();
+            connectionTimerRestarted = true;
+            LOG_INFO("Main", "Device connected - timer restarted for authentication (30s)");
+          }
+        }
+
         if (bleKeyboardManager.isSecure()) {
           LOG_INFO("Main", "BLE secure connection established");
           currentMode = AppMode::BLE_PIN_ENTRY;
           lastActivityTime = millis(); // Reset timeout on PIN entry transition
           bleInitialized = false; // Reset for next time
           bleStartTime = 0;
+          connectionTimerRestarted = false;
         } else {
           // Защита от спама - логировать только раз в секунду
           static unsigned long lastAuthLog = 0;
@@ -2016,15 +2388,21 @@ void loop() {
           }
 
           // Таймаут аутентификации - 30 секунд
-          if (millis() - bleStartTime > 30000) {
+          if (currentMode == AppMode::BLE_ADVERTISING &&
+              millis() - bleStartTime > 30000) {
             LOG_WARNING("Main", "Authentication timeout - disconnecting");
             bleKeyboardManager.end();
             currentMode = AppMode::PASSWORD;
             bleActionTriggered = false;
+            autoSendDone = false;
             bleInitialized = false;
             pinPageDrawn = false;
+            connectionTimerRestarted = false;
           }
         }
+      } else {
+        // Устройство не подключено - сбрасываем флаг возможности перезапуска таймера
+        connectionTimerRestarted = false;
       }
 
       // Handle back button press
@@ -2034,6 +2412,7 @@ void loop() {
         bleKeyboardManager.end();
         currentMode = AppMode::PASSWORD;
         bleActionTriggered = false;
+        autoSendDone = false;
         bleInitialized = false;
         bleStartTime = 0;
         lastActivityTime = millis(); // Reset timeout — user just interacted
@@ -2044,17 +2423,36 @@ void loop() {
       LOG_INFO("Main", "BLE secure connection established. Checking Device BLE "
                        "PIN requirements...");
 
+      // 🔒 Гарантируем что экран включён перед PIN вводом.
+      // Накопленный таймаут мог вырубить экран в момент перехода из
+      // BLE_ADVERTISING → BLE_PIN_ENTRY (race condition с isScreenOn).
+      lastActivityTime = millis(); // сброс таймера — начинаем отсчёт заново
+      if (!isScreenOn) {
+        LOG_INFO("Main", "Screen was off at BLE_PIN_ENTRY — turning on for PIN input");
+        displayManager.turnOn();
+        isScreenOn = true;
+        isDimmed = false;
+      } else if (isDimmed) {
+        displayManager.setBrightness(255);
+        isDimmed = false;
+      }
+
       bool pinOk = true;
 
       // Проверяем включен ли Device BLE PIN
       if (CryptoManager::getInstance().isDeviceBlePinEnabled()) {
         LOG_INFO("Main", "Device BLE PIN protection enabled, requesting PIN "
                          "for transmission...");
+        lastActivityTime = millis(); // второй сброс — непосредственно перед блокирующим вызовом
         pinOk = pinManager.requestDeviceBlePinForTransmission();
       } else {
         LOG_INFO("Main", "Device BLE PIN protection disabled. Proceeding to "
                          "send confirmation");
       }
+
+      // После возврата из блокирующего вызова — снова сбрасываем таймер,
+      // чтобы экран не гас сразу при переходе в BLE_CONFIRM_SEND
+      lastActivityTime = millis();
 
       if (pinOk) {
         LOG_INFO("Main", "BLE access granted. Proceeding to send confirmation");
@@ -2065,6 +2463,7 @@ void loop() {
         bleKeyboardManager.end();
         currentMode = AppMode::PASSWORD;
         bleActionTriggered = false;
+        autoSendDone = false;
       }
     } break;
 
@@ -2072,11 +2471,13 @@ void loop() {
       static bool confirmPageDrawn = false;
 
       auto passwords = passwordManager.getAllPasswords();
-      if (passwords.empty() || currentPasswordIndex >= passwords.size()) {
+      if (passwords.empty() || currentPasswordIndex >= (int)passwords.size()) {
         // Safety check
         currentMode = AppMode::PASSWORD;
         bleKeyboardManager.end();
         bleActionTriggered = false;
+        autoSendTriggered = false;
+        autoSendDone = false;
         confirmPageDrawn = false;
         break;
       }
@@ -2089,28 +2490,44 @@ void loop() {
         displayManager.drawBleConfirmPage(passwordName, password, deviceName);
         confirmPageDrawn = true;
         previousPasswordIndex = currentPasswordIndex;
+
+        // Автоотправка без нажатия кнопки
+        if (currentPasswordIndex >= 0 && !autoSendDone) {
+          if (passwords[currentPasswordIndex].auto_send) {
+            LOG_INFO("Main", "Auto-send: triggering without button press");
+            autoSendTriggered = true;
+          }
+        }
       }
 
-      // Wait for button press
+      // Wait for button press or auto-send trigger
       if (readBtn1()) { // Back button
         delay(200);
         LOG_INFO("Main", "Back button pressed. Cancelling send");
         currentMode = AppMode::PASSWORD;
         bleKeyboardManager.end();
         bleActionTriggered = false;
+        autoSendTriggered = false;
+        autoSendDone = false;
         confirmPageDrawn = false;
         lastActivityTime = millis(); // Reset timeout — user just interacted
-      } else if (readBtn2()) { // Send button
-        delay(200);
-        LOG_INFO("Main", "Send button pressed. Sending data");
+      } else if (readBtn2() || autoSendTriggered) { // Send button or Auto-send
+        if (!autoSendTriggered) delay(200); // Only delay for physical button
+        LOG_INFO("Main", autoSendTriggered ? "Auto-sending data" : "Send button pressed. Sending data");
 
         displayManager.drawBleSendingPage();
         String password = passwords[currentPasswordIndex].password;
         bleKeyboardManager.sendPassword(password.c_str());
+        if (passwords[currentPasswordIndex].auto_send) {
+          bleKeyboardManager.sendEnter();
+        }
         delay(500); // Give time for the UI and BLE
 
         displayManager.drawBleResultPage(true); // Show success
         delay(1500);
+
+        autoSendTriggered = false; // Сбрасываем флаг
+        autoSendDone = true;       // Помечаем, что автоотправка выполнена
 
         // Возвращаемся к странице подтверждения для повторной отправки
         LOG_INFO("Main",
@@ -2128,6 +2545,7 @@ void loop() {
       if (passwords.empty() || currentPasswordIndex >= (int)passwords.size()) {
         currentMode = AppMode::PASSWORD;
         bleActionTriggered = false;
+        autoSendDone = false;
         usbPageDrawn = false;
         displayManager.setUsbHidMode(false);
         usbHidManager.end();
@@ -2162,6 +2580,9 @@ void loop() {
           String password = passwords[currentPasswordIndex].password;
           displayManager.drawUsbHidPage(passwordName, "Sending...");
           usbHidManager.sendPassword(password.c_str());
+          if (passwords[currentPasswordIndex].auto_send) {
+            usbHidManager.sendEnter();
+          }
           delay(500);
           lastUsbStatusDrawn = "";
         }
@@ -2174,6 +2595,7 @@ void loop() {
           usbHidManager.end();
           displayManager.setUsbHidMode(false);
           bleActionTriggered = false;
+          autoSendDone = false;
           usbPageDrawn = false;
           lastUsbStatusDrawn = "";
           pendingUsbStatus = "";

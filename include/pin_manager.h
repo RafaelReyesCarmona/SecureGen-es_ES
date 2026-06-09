@@ -41,7 +41,7 @@ public:
     void setPinEnabledForDevice(bool enabled); // Deprecated
     
     // --- Public PIN input method (used by main.cpp for device confirmation) ---
-    String requestPinInput(const String& title, bool isConfirmScreen = false); // Универсальный ввод PIN
+    String requestPinInput(const String& title, bool isConfirmScreen = false, int entryGuardMs = 1000); // Универсальный ввод PIN
 
 private:
     DisplayManager& displayManager;

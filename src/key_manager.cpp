@@ -271,12 +271,16 @@ bool KeyManager::replaceAllKeys(const String& jsonContent) {
 
 bool KeyManager::loadKeys() {
     LOG_DEBUG("KeyManager", "Loading TOTP keys from file");
-    if (!LittleFS.exists(KEYS_FILE)) {
+    
+    // Use space-aware path
+    String keysPath = CryptoManager::getInstance().getSpacePath("keys");
+    
+    if (!LittleFS.exists(keysPath)) {
         LOG_INFO("KeyManager", "Keys file doesn't exist yet, starting with empty list");
         return true;
     }
 
-    File file = LittleFS.open(KEYS_FILE, "r");
+    File file = LittleFS.open(keysPath, "r");
     if (!file) {
         LOG_ERROR("KeyManager", "Failed to open keys file for reading");
         return false;
@@ -407,7 +411,10 @@ bool KeyManager::saveKeys() {
         return false;
     }
 
-    File file = LittleFS.open(KEYS_FILE, "w");
+    // Use space-aware path
+    String keysPath = CryptoManager::getInstance().getSpacePath("keys");
+    
+    File file = LittleFS.open(keysPath, "w");
     if (!file) {
         LOG_ERROR("KeyManager", "Failed to open keys file for writing");
         return false;

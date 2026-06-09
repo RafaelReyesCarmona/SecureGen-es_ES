@@ -12,6 +12,13 @@
 #include <esp_task_wdt.h> // <-- ADDED for watchdog reset during PBKDF2
 #include <ArduinoJson.h> // <-- ADDED for new functions
 
+// Out-of-class definitions for static constexpr (required by C++11/14)
+constexpr uint8_t CryptoManager::DEVICE_KEY_MAGIC[4];
+constexpr int CryptoManager::SLOT_A_OFFSET;
+constexpr int CryptoManager::SLOT_B_OFFSET;
+constexpr int CryptoManager::KEY_FILE_SIZE;
+constexpr char CryptoManager::SPACE_FLAGS_FILE[];
+
 // ✅ ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ: Безопасная генерация случайных байтов (fallback)
 // Использует esp_random() эффективно (по 4 байта) вместо побайтовой генерации
 static void generateSecureRandomBytes_fallback(uint8_t* buffer, size_t length) {
@@ -195,7 +202,9 @@ CryptoManager& CryptoManager::getInstance() {
     return instance;
 }
 
-CryptoManager::CryptoManager() : _isKeyInitialized(false), _isDrbgInitialized(false) {}
+CryptoManager::CryptoManager() : _isKeyInitialized(false), _isDrbgInitialized(false), 
+                                 _activeSpace(ActiveSpace::NONE), _hiddenSpaceProvisioned(false),
+                                 _shareWifiWithHiddenSpace(false) {}
 
 void CryptoManager::begin() {
     if (_isKeyInitialized) return;
@@ -330,33 +339,23 @@ bool CryptoManager::isDeviceKeyEncrypted() {
     }
     
     size_t fileSize = keyFile.size();
+    keyFile.close();
     
-    if (fileSize == 81) {
-        // v3 format: [flag=0x03][salt 16][iv 16][encrypted 48]
-        uint8_t flag = keyFile.read();
-        keyFile.close();
-        return (flag == 0x03);
-    } else if (fileSize == 65) {
-        // Новый формат v2: [flag=0x02][salt 16][encrypted 48]
-        uint8_t flag = keyFile.read();
-        keyFile.close();
-        return (flag == 0x02);
-    } else if (fileSize == 49) {
-        // Старый формат v1: [flag=0x01][salt 16][encrypted_key 32]
-        uint8_t flag = keyFile.read();
-        keyFile.close();
-        return (flag == 0x01);
-    } else if (fileSize == 33) {
-        // legacy unencrypted format: [flag=0x00][key 32 bytes]
-        keyFile.close();
-        return false; // 33-byte format is always unencrypted
-    } else if (fileSize == 32) {
-        // Legacy формат без флага (незашифрованный)
-        keyFile.close();
+    // New dual-slot format
+    if (fileSize == KEY_FILE_SIZE) {
+        return true;
+    }
+    
+    // Legacy formats
+    if (fileSize == 81 || fileSize == 65 || fileSize == 49) {
+        return true;
+    }
+    
+    // Unencrypted legacy formats
+    if (fileSize == 33 || fileSize == 32) {
         return false;
     }
     
-    keyFile.close();
     LOG_ERROR("CryptoManager", "Invalid device.key file size: " + String(fileSize));
     return false;
 }
@@ -369,17 +368,99 @@ bool CryptoManager::createEncryptedDeviceKey(const String& pin) {
         return false;
     }
     
-    // 1. Генерируем новый device key
+    // 1. Generate 256 random bytes for the entire file
+    uint8_t fileData[KEY_FILE_SIZE];
+    secureRandom(fileData, KEY_FILE_SIZE);
+    
+    // 2. Write random data to file first
+    fs::File keyFile = LittleFS.open(DEVICE_KEY_FILE, "w");
+    if (!keyFile) {
+        LOG_ERROR("CryptoManager", "Failed to open device.key for writing");
+        return false;
+    }
+    keyFile.write(fileData, KEY_FILE_SIZE);
+    keyFile.close();
+    
+    // 3. Generate new device key
     generateNewDeviceKey();
     
-    // 2. Шифруем его PIN-кодом
-    if (!encryptDeviceKeyWithPin(pin)) {
-        LOG_ERROR("CryptoManager", "Failed to encrypt device key with PIN");
+    // 4. Prepare slot A data
+    uint8_t salt[16], iv[16];
+    secureRandom(salt, 16);
+    secureRandom(iv, 16);
+    
+    // Build payload: [MAGIC:4][device_key:32][padding:12]
+    uint8_t payload[48];
+    memset(payload, 0, 48);
+    memcpy(payload, DEVICE_KEY_MAGIC, 4);
+    memcpy(payload + 4, _deviceKey, 32);
+    // bytes 36-47 remain zero (padding)
+    
+    // 5. Derive AES key from PIN
+    const int key_len = 32;
+    const int iterations = PBKDF2_ITERATIONS_PIN;
+    
+    esp_task_wdt_reset();
+    
+    uint8_t derived_key[key_len];
+    mbedtls_md_context_t sha256_ctx;
+    mbedtls_md_init(&sha256_ctx);
+    mbedtls_md_setup(&sha256_ctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), 1);
+    
+    int ret = mbedtls_pkcs5_pbkdf2_hmac(
+        &sha256_ctx,
+        (const unsigned char*)pin.c_str(), pin.length(),
+        salt, 16,
+        iterations,
+        key_len,
+        derived_key
+    );
+    
+    mbedtls_md_free(&sha256_ctx);
+    esp_task_wdt_reset();
+    
+    if (ret != 0) {
+        LOG_ERROR("CryptoManager", "PBKDF2 derivation failed");
+        secure_memzero(derived_key, sizeof(derived_key));
+        secure_memzero(payload, sizeof(payload));
         return false;
     }
     
+    // 6. Encrypt payload with AES-256-CBC
+    uint8_t iv_copy[16];
+    memcpy(iv_copy, iv, 16);
+    
+    uint8_t encrypted[48];
+    mbedtls_aes_context aes;
+    mbedtls_aes_init(&aes);
+    mbedtls_aes_setkey_enc(&aes, derived_key, 256);
+    mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_ENCRYPT, 48, iv_copy, payload, encrypted);
+    mbedtls_aes_free(&aes);
+    
+    // 7. Write slot A to file (overwrite bytes 0-79)
+    keyFile = LittleFS.open(DEVICE_KEY_FILE, "r+");
+    if (!keyFile) {
+        LOG_ERROR("CryptoManager", "Failed to reopen device.key for slot A write");
+        secure_memzero(derived_key, sizeof(derived_key));
+        secure_memzero(payload, sizeof(payload));
+        return false;
+    }
+    
+    keyFile.seek(SLOT_A_OFFSET);
+    keyFile.write(salt, 16);
+    keyFile.write(iv, 16);
+    keyFile.write(encrypted, 48);
+    keyFile.close();
+    
+    secure_memzero(derived_key, sizeof(derived_key));
+    secure_memzero(payload, sizeof(payload));
+    
     _isKeyInitialized = true;
-    LOG_INFO("CryptoManager", "Device key created and encrypted successfully");
+    _activeSpace = ActiveSpace::A;
+    _hiddenSpaceProvisioned = false;
+    initSpacePaths();  // Initialize space-aware paths
+    
+    LOG_INFO("CryptoManager", "Device key created in dual-slot format (256 bytes, slot A)");
     return true;
 }
 
@@ -391,13 +472,56 @@ bool CryptoManager::unlockDeviceKeyWithPin(const String& pin) {
         return false;
     }
     
+    // Check file size to determine format
+    fs::File keyFile = LittleFS.open(DEVICE_KEY_FILE, "r");
+    if (!keyFile) {
+        LOG_ERROR("CryptoManager", "Failed to open device.key");
+        return false;
+    }
+    
+    size_t fileSize = keyFile.size();
+    keyFile.close();
+    
+    // New dual-slot format
+    if (fileSize == KEY_FILE_SIZE) {
+        LOG_INFO("CryptoManager", "Detected dual-slot format (256 bytes)");
+        
+        // Try slot A first
+        if (tryDecryptSlot(pin, SLOT_A_OFFSET)) {
+            _activeSpace = ActiveSpace::A;
+            _isKeyInitialized = true;
+            initSpacePaths();  // Initialize space-aware paths
+            loadSpaceFlags();  // Load flags from /.net_prefs
+            LOG_INFO("CryptoManager", "Device key unlocked from slot A");
+            return true;
+        }
+        
+        // Try slot B
+        if (tryDecryptSlot(pin, SLOT_B_OFFSET)) {
+            _activeSpace = ActiveSpace::B;
+            _isKeyInitialized = true;
+            _hiddenSpaceProvisioned = true;
+            initSpacePaths();  // Initialize space-aware paths
+            loadSpaceFlags();  // Load flags from /.net_prefs
+            LOG_INFO("CryptoManager", "Device key unlocked from alternate slot");
+            return true;
+        }
+        
+        LOG_ERROR("CryptoManager", "Failed to decrypt with PIN from both slots");
+        return false;
+    }
+    
+    // Legacy format - use old decryption logic
+    LOG_INFO("CryptoManager", "Detected legacy format, using backward compatibility mode");
     if (!decryptDeviceKeyWithPin(pin)) {
         LOG_ERROR("CryptoManager", "Failed to decrypt device key with PIN");
         return false;
     }
     
     _isKeyInitialized = true;
-    LOG_INFO("CryptoManager", "Device key unlocked successfully");
+    _activeSpace = ActiveSpace::A; // Legacy formats are always space A
+    initSpacePaths();  // Initialize space-aware paths
+    LOG_INFO("CryptoManager", "Device key unlocked successfully (legacy format)");
     return true;
 }
 
@@ -1147,7 +1271,10 @@ bool CryptoManager::saveBlePin(uint32_t pin) {
             return false;
         }
         
-        File file = LittleFS.open("/ble_pin.json.enc", "w");
+        // Use space-aware path
+        String blePinPath = getSpacePath("ble_pin");
+        
+        File file = LittleFS.open(blePinPath, "w");
         if (!file) {
             Serial.println("[CryptoManager] Error: Cannot create BLE PIN file");
             return false;
@@ -1166,7 +1293,10 @@ bool CryptoManager::saveBlePin(uint32_t pin) {
 }
 
 uint32_t CryptoManager::loadBlePin() {
-    if (!LittleFS.exists("/ble_pin.json.enc")) {
+    // Use space-aware path
+    String blePinPath = getSpacePath("ble_pin");
+    
+    if (!LittleFS.exists(blePinPath)) {
         LOG_INFO("CryptoManager", "BLE PIN file not found - first boot detected");
         
         #if BLE_PIN_AUTO_GENERATE
@@ -1187,7 +1317,7 @@ uint32_t CryptoManager::loadBlePin() {
     }
     
     try {
-        File file = LittleFS.open("/ble_pin.json.enc", "r");
+        File file = LittleFS.open(blePinPath, "r");
         if (!file) {
             LOG_ERROR("CryptoManager", "Cannot open BLE PIN file - regenerating");
             uint32_t newPin = generateSecurePin();
@@ -1231,7 +1361,9 @@ uint32_t CryptoManager::loadBlePin() {
 }
 
 bool CryptoManager::isBlePinConfigured() {
-    return LittleFS.exists("/ble_pin.json.enc");
+    // Use space-aware path
+    String blePinPath = getSpacePath("ble_pin");
+    return LittleFS.exists(blePinPath);
 }
 
 // --- Device BLE PIN Management ---
@@ -1264,7 +1396,10 @@ bool CryptoManager::saveDeviceBlePin(uint32_t pin) {
             return false;
         }
         
-        File file = LittleFS.open("/device_ble_pin.json.enc", "w");
+        // Use space-aware path
+        String deviceBlePinPath = getSpacePath("device_ble_pin");
+        
+        File file = LittleFS.open(deviceBlePinPath, "w");
         if (!file) {
             Serial.println("[CryptoManager] Error: Cannot create Device BLE PIN file");
             return false;
@@ -1283,13 +1418,16 @@ bool CryptoManager::saveDeviceBlePin(uint32_t pin) {
 }
 
 uint32_t CryptoManager::loadDeviceBlePin() {
-    if (!LittleFS.exists("/device_ble_pin.json.enc")) {
+    // Use space-aware path
+    String deviceBlePinPath = getSpacePath("device_ble_pin");
+    
+    if (!LittleFS.exists(deviceBlePinPath)) {
         LOG_INFO("CryptoManager", "Device BLE PIN file not found");
         return 0xFFFFFFFF; // Специальное значение означающее "не настроен"
     }
     
     try {
-        File file = LittleFS.open("/device_ble_pin.json.enc", "r");
+        File file = LittleFS.open(deviceBlePinPath, "r");
         if (!file) {
             LOG_ERROR("CryptoManager", "Cannot open Device BLE PIN file");
             return 0xFFFFFFFF;
@@ -1327,16 +1465,21 @@ uint32_t CryptoManager::loadDeviceBlePin() {
 bool CryptoManager::isDeviceBlePinConfigured() {
     // Просто проверяем существование файла без попытки расшифровки
     // Это избегает ошибок "Failed to decrypt Device BLE PIN" когда PIN отключен
-    return LittleFS.exists("/device_ble_pin.json.enc");
+    // Use space-aware path
+    String deviceBlePinPath = getSpacePath("device_ble_pin");
+    return LittleFS.exists(deviceBlePinPath);
 }
 
 bool CryptoManager::isDeviceBlePinEnabled() {
-    if (!LittleFS.exists("/device_ble_pin.json.enc")) {
+    // Use space-aware path
+    String deviceBlePinPath = getSpacePath("device_ble_pin");
+    
+    if (!LittleFS.exists(deviceBlePinPath)) {
         return false;
     }
     
     try {
-        File file = LittleFS.open("/device_ble_pin.json.enc", "r");
+        File file = LittleFS.open(deviceBlePinPath, "r");
         if (!file) {
             return false;
         }
@@ -1398,7 +1541,10 @@ void CryptoManager::setDeviceBlePinEnabled(bool enabled) {
             return;
         }
         
-        File file = LittleFS.open("/device_ble_pin.json.enc", "w");
+        // Use space-aware path
+        String deviceBlePinPath = getSpacePath("device_ble_pin");
+        
+        File file = LittleFS.open(deviceBlePinPath, "w");
         if (!file) {
             LOG_ERROR("CryptoManager", "Cannot open Device BLE PIN file for writing");
             return;
@@ -1431,6 +1577,14 @@ bool CryptoManager::saveDuressPin(const String& pin) {
     if ((int)pin.length() != expected) return false;
     for (char c : pin) { if (!isdigit(c)) return false; }
     if (!_isKeyInitialized) { LOG_ERROR("CryptoManager","saveDuressPin: key not ready"); return false; }
+    
+    // ═══ COLLISION CHECK: duress PIN must not match any space PIN ═══
+    bool matchesSlotA = wouldUnlockSlot(pin, 0);
+    bool matchesSlotB = _hiddenSpaceProvisioned && wouldUnlockSlot(pin, 80);
+    if (matchesSlotA || matchesSlotB) {
+        LOG_WARNING("CryptoManager", "saveDuressPin: conflicts with space PIN - rejected");
+        return false;
+    }
     uint8_t salt[16];
     secureRandom(salt, 16);
     uint8_t hash[32];
@@ -1441,7 +1595,11 @@ bool CryptoManager::saveDuressPin(const String& pin) {
                                          salt, 16, PBKDF2_ITERATIONS_PIN, 32, hash);
     mbedtls_md_free(&ctx);
     if (ret != 0) { LOG_ERROR("CryptoManager","saveDuressPin: PBKDF2 failed"); return false; }
-    File f = LittleFS.open("/duress_pin.hash", "w");
+    
+    // Use hardcoded Space A path (duress PIN is global)
+    String duressPinPath = "/duress_pin.hash";
+    
+    File f = LittleFS.open(duressPinPath, "w");
     if (!f) { LOG_ERROR("CryptoManager","saveDuressPin: cannot create file"); return false; }
     uint8_t header[2] = {0x01, 0x01};
     size_t w1 = f.write(header, 2);
@@ -1450,7 +1608,7 @@ bool CryptoManager::saveDuressPin(const String& pin) {
     f.close();
     if (w1 != 2 || w2 != 16 || w3 != 32) {
         LOG_ERROR("CryptoManager", "saveDuressPin: write failed, removing incomplete file");
-        LittleFS.remove("/duress_pin.hash");
+        LittleFS.remove(duressPinPath);
         return false;
     }
     LOG_INFO("CryptoManager","Duress PIN saved");
@@ -1461,8 +1619,12 @@ bool CryptoManager::verifyDuressPin(const String& pin) {
     int expected = _readDuressPinExpectedLength();
     if ((int)pin.length() != expected) return false;
     for (char c : pin) { if (!isdigit(c)) return false; }
-    if (!LittleFS.exists("/duress_pin.hash")) return false;
-    File f = LittleFS.open("/duress_pin.hash", "r");
+    
+    // Use hardcoded Space A path (duress PIN is global)
+    String duressPinPath = "/duress_pin.hash";
+    
+    if (!LittleFS.exists(duressPinPath)) return false;
+    File f = LittleFS.open(duressPinPath, "r");
     if (!f || f.size() != 50) { if (f) f.close(); return false; }
     uint8_t buf[50]; f.read(buf, 50); f.close();
     if (buf[0] != 0x01 || buf[1] != 0x01) {
@@ -1489,22 +1651,31 @@ bool CryptoManager::verifyDuressPin(const String& pin) {
 }
 
 bool CryptoManager::isDuressPinConfigured() {
-    if (!LittleFS.exists("/duress_pin.hash")) return false;
-    File f = LittleFS.open("/duress_pin.hash", "r");
+    // Use hardcoded Space A path (duress PIN is global)
+    String duressPinPath = "/duress_pin.hash";
+    
+    if (!LittleFS.exists(duressPinPath)) return false;
+    File f = LittleFS.open(duressPinPath, "r");
     bool ok = (f && f.size() == 50); if (f) f.close(); return ok;
 }
 
 bool CryptoManager::isDuressPinEnabled() {
-    if (!LittleFS.exists("/duress_pin.hash")) return false;
-    File f = LittleFS.open("/duress_pin.hash", "r");
+    // Use hardcoded Space A path (duress PIN is global)
+    String duressPinPath = "/duress_pin.hash";
+    
+    if (!LittleFS.exists(duressPinPath)) return false;
+    File f = LittleFS.open(duressPinPath, "r");
     if (!f || f.size() != 50) { if (f) f.close(); return false; }
     uint8_t h[2]; f.read(h, 2); f.close();
     return (h[0] == 0x01 && h[1] == 0x01);
 }
 
 bool CryptoManager::setDuressPinEnabled(bool enabled) {
-    if (!LittleFS.exists("/duress_pin.hash")) return false;
-    File f = LittleFS.open("/duress_pin.hash", "r+");
+    // Use hardcoded Space A path (duress PIN is global)
+    String duressPinPath = "/duress_pin.hash";
+    
+    if (!LittleFS.exists(duressPinPath)) return false;
+    File f = LittleFS.open(duressPinPath, "r+");
     if (!f || f.size() != 50) { if (f) f.close(); return false; }
     f.seek(1); f.write(enabled ? 0x01 : 0x00); f.close();
     LOG_INFO("CryptoManager","Duress PIN enabled=" + String(enabled));
@@ -1656,7 +1827,10 @@ bool CryptoManager::saveSession(const String& sessionId, const String& csrfToken
         return false;
     }
     
-    File file = LittleFS.open("/session.json.enc", "w");
+    // Use space-aware path
+    String sessionPath = getSpacePath("session");
+    
+    File file = LittleFS.open(sessionPath, "w");
     if (!file) {
         LOG_ERROR("CryptoManager", "Failed to open session file for writing");
         return false;
@@ -1683,12 +1857,15 @@ bool CryptoManager::loadSession(String& sessionId, String& csrfToken, unsigned l
         return false;
     }
     
-    if (!LittleFS.exists("/session.json.enc")) {
+    // Use space-aware path
+    String sessionPath = getSpacePath("session");
+    
+    if (!LittleFS.exists(sessionPath)) {
         LOG_DEBUG("CryptoManager", "No persistent session file found");
         return false;
     }
     
-    File sessionFile = LittleFS.open("/session.json.enc", "r");
+    File sessionFile = LittleFS.open(sessionPath, "r");
     if (!sessionFile) {
         LOG_ERROR("CryptoManager", "Failed to open session file");
         return false;
@@ -1757,8 +1934,11 @@ bool CryptoManager::loadSession(String& sessionId, String& csrfToken, unsigned l
 }
 
 bool CryptoManager::clearSession() {
-    if (LittleFS.exists("/session.json.enc")) {
-        if (LittleFS.remove("/session.json.enc")) {
+    // Use space-aware path
+    String sessionPath = getSpacePath("session");
+    
+    if (LittleFS.exists(sessionPath)) {
+        if (LittleFS.remove(sessionPath)) {
             LOG_INFO("CryptoManager", "Session file cleared from storage");
             return true;
         } else {
@@ -1841,4 +2021,732 @@ void CryptoManager::wipeDeviceKey() {
         secure_memzero(_deviceKey, sizeof(_deviceKey));
         _isKeyInitialized = false;
     }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DUAL-SLOT HIDDEN VOLUME SUPPORT (VeraCrypt-style)
+// ═══════════════════════════════════════════════════════════════════════════
+
+bool CryptoManager::tryDecryptSlot(const String& pin, int slotOffset) {
+    LOG_DEBUG("CryptoManager", "Attempting to decrypt slot at offset " + String(slotOffset));
+    
+    // 1. Open file and verify size
+    fs::File keyFile = LittleFS.open(DEVICE_KEY_FILE, "r");
+    if (!keyFile) {
+        LOG_ERROR("CryptoManager", "Failed to open device.key");
+        return false;
+    }
+    
+    if (keyFile.size() != KEY_FILE_SIZE) {
+        LOG_ERROR("CryptoManager", "Invalid file size: " + String(keyFile.size()));
+        keyFile.close();
+        return false;
+    }
+    
+    // 2. Read slot data: [salt:16][iv:16][encrypted:48]
+    keyFile.seek(slotOffset);
+    
+    uint8_t salt[16], iv[16], encrypted[48];
+    keyFile.read(salt, 16);
+    keyFile.read(iv, 16);
+    keyFile.read(encrypted, 48);
+    keyFile.close();
+    
+    // 3. Derive AES key from PIN + salt
+    const int key_len = 32;
+    const int iterations = PBKDF2_ITERATIONS_PIN;
+    
+    esp_task_wdt_reset();
+    
+    uint8_t derived_key[key_len];
+    mbedtls_md_context_t sha256_ctx;
+    mbedtls_md_init(&sha256_ctx);
+    mbedtls_md_setup(&sha256_ctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), 1);
+    
+    int ret = mbedtls_pkcs5_pbkdf2_hmac(
+        &sha256_ctx,
+        (const unsigned char*)pin.c_str(), pin.length(),
+        salt, 16,
+        iterations,
+        key_len,
+        derived_key
+    );
+    
+    mbedtls_md_free(&sha256_ctx);
+    esp_task_wdt_reset();
+    
+    if (ret != 0) {
+        LOG_ERROR("CryptoManager", "PBKDF2 failed");
+        secure_memzero(derived_key, sizeof(derived_key));
+        return false;
+    }
+    
+    // 4. Decrypt with AES-256-CBC
+    uint8_t iv_copy[16];
+    memcpy(iv_copy, iv, 16);
+    
+    uint8_t plaintext[48];
+    mbedtls_aes_context aes;
+    mbedtls_aes_init(&aes);
+    mbedtls_aes_setkey_dec(&aes, derived_key, 256);
+    mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_DECRYPT, 48, iv_copy, encrypted, plaintext);
+    mbedtls_aes_free(&aes);
+    
+    // 5. Verify MAGIC bytes
+    if (memcmp(plaintext, DEVICE_KEY_MAGIC, 4) != 0) {
+        LOG_DEBUG("CryptoManager", "MAGIC mismatch at slot offset " + String(slotOffset));
+        secure_memzero(derived_key, sizeof(derived_key));
+        secure_memzero(plaintext, sizeof(plaintext));
+        return false;
+    }
+    
+    // 6. Extract device key
+    memcpy(_deviceKey, plaintext + 4, 32);
+    
+    secure_memzero(derived_key, sizeof(derived_key));
+    secure_memzero(plaintext, sizeof(plaintext));
+    
+    LOG_INFO("CryptoManager", "Successfully decrypted slot at offset " + String(slotOffset));
+    return true;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// NEW: Duress PIN Collision Detection
+// ═══════════════════════════════════════════════════════════════════════════
+
+bool CryptoManager::wouldUnlockSlot(const String& pin, size_t slotOffset) {
+    LOG_DEBUG("CryptoManager", "Checking if PIN would unlock slot at offset " + String(slotOffset));
+    
+    // Use temporary buffer for key - no side effects
+    uint8_t tmpKey[32] = {0};
+    bool result = tryDecryptSlotDry(pin, slotOffset, tmpKey);
+    secure_memzero(tmpKey, 32);
+    
+    return result;
+}
+
+bool CryptoManager::tryDecryptSlotDry(const String& pin, size_t slotOffset, uint8_t* outKey) {
+    // Mirror of tryDecryptSlot but writes to outKey (temp buffer)
+    // and does NOT update any member variables (_deviceKey, _activeSpace)
+    // Returns true if MAGIC matches
+    
+    // 1. Open file and verify size
+    fs::File keyFile = LittleFS.open(DEVICE_KEY_FILE, "r");
+    if (!keyFile) {
+        return false;
+    }
+    
+    if (keyFile.size() != KEY_FILE_SIZE) {
+        keyFile.close();
+        return false;
+    }
+    
+    // 2. Read slot data: [salt:16][iv:16][encrypted:48]
+    keyFile.seek(slotOffset);
+    
+    uint8_t salt[16], iv[16], encrypted[48];
+    keyFile.read(salt, 16);
+    keyFile.read(iv, 16);
+    keyFile.read(encrypted, 48);
+    keyFile.close();
+    
+    // 3. Derive AES key from PIN + salt
+    const int key_len = 32;
+    const int iterations = PBKDF2_ITERATIONS_PIN;
+    
+    esp_task_wdt_reset();
+    
+    uint8_t derived_key[key_len];
+    mbedtls_md_context_t sha256_ctx;
+    mbedtls_md_init(&sha256_ctx);
+    mbedtls_md_setup(&sha256_ctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), 1);
+    
+    int ret = mbedtls_pkcs5_pbkdf2_hmac(
+        &sha256_ctx,
+        (const unsigned char*)pin.c_str(), pin.length(),
+        salt, 16,
+        iterations,
+        key_len,
+        derived_key
+    );
+    
+    mbedtls_md_free(&sha256_ctx);
+    esp_task_wdt_reset();
+    
+    if (ret != 0) {
+        secure_memzero(derived_key, sizeof(derived_key));
+        return false;
+    }
+    
+    // 4. Decrypt with AES-256-CBC
+    uint8_t iv_copy[16];
+    memcpy(iv_copy, iv, 16);
+    
+    uint8_t plaintext[48];
+    mbedtls_aes_context aes;
+    mbedtls_aes_init(&aes);
+    mbedtls_aes_setkey_dec(&aes, derived_key, 256);
+    mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_DECRYPT, 48, iv_copy, encrypted, plaintext);
+    mbedtls_aes_free(&aes);
+    
+    // 5. Verify MAGIC bytes
+    bool magicMatch = (memcmp(plaintext, DEVICE_KEY_MAGIC, 4) == 0);
+    
+    if (magicMatch && outKey) {
+        // Extract device key to output buffer (for caller inspection if needed)
+        memcpy(outKey, plaintext + 4, 32);
+    }
+    
+    secure_memzero(derived_key, sizeof(derived_key));
+    secure_memzero(plaintext, sizeof(plaintext));
+    
+    return magicMatch;
+}
+
+bool CryptoManager::isHiddenSpaceProvisioned() {
+    // This flag is set when:
+    // 1. createHiddenSpace() succeeds
+    // 2. unlockDeviceKeyWithPin() successfully decrypts slot B
+    // 3. tryDecryptSlot() reads the flag from slot A payload
+    return _hiddenSpaceProvisioned;
+}
+
+bool CryptoManager::createHiddenSpace(const String& pin) {
+    LOG_INFO("CryptoManager", "Initializing secondary slot...");
+    
+    // 1. Verify we're in Space A
+    if (_activeSpace != ActiveSpace::A) {
+        LOG_ERROR("CryptoManager", "Secondary slot can only be created from primary context");
+        return false;
+    }
+    
+    if (!_isKeyInitialized) {
+        LOG_ERROR("CryptoManager", "Device key not initialized");
+        return false;
+    }
+    
+    // 2. Generate new random device key for space B
+    uint8_t device_key_B[32];
+    secureRandom(device_key_B, 32);
+    
+    // 3. Generate salt and IV for slot B
+    uint8_t salt_B[16], iv_B[16];
+    secureRandom(salt_B, 16);
+    secureRandom(iv_B, 16);
+    
+    // 4. Build payload B: [MAGIC:4][device_key_B:32][padding:12]
+    uint8_t payload_B[48];
+    memset(payload_B, 0, 48);
+    memcpy(payload_B, DEVICE_KEY_MAGIC, 4);
+    memcpy(payload_B + 4, device_key_B, 32);
+    // bytes 36-47 remain zero (padding)
+    
+    // 5. Derive AES key from PIN
+    const int key_len = 32;
+    const int iterations = PBKDF2_ITERATIONS_PIN;
+    
+    esp_task_wdt_reset();
+    
+    uint8_t derived_key_B[key_len];
+    mbedtls_md_context_t sha256_ctx;
+    mbedtls_md_init(&sha256_ctx);
+    mbedtls_md_setup(&sha256_ctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), 1);
+    
+    int ret = mbedtls_pkcs5_pbkdf2_hmac(
+        &sha256_ctx,
+        (const unsigned char*)pin.c_str(), pin.length(),
+        salt_B, 16,
+        iterations,
+        key_len,
+        derived_key_B
+    );
+    
+    mbedtls_md_free(&sha256_ctx);
+    esp_task_wdt_reset();
+    
+    if (ret != 0) {
+        LOG_ERROR("CryptoManager", "PBKDF2 derivation failed");
+        secure_memzero(derived_key_B, sizeof(derived_key_B));
+        secure_memzero(payload_B, sizeof(payload_B));
+        secure_memzero(device_key_B, sizeof(device_key_B));
+        return false;
+    }
+    
+    // 6. Encrypt payload B with AES-256-CBC
+    uint8_t iv_copy[16];
+    memcpy(iv_copy, iv_B, 16);
+    
+    uint8_t encrypted_B[48];
+    mbedtls_aes_context aes;
+    mbedtls_aes_init(&aes);
+    mbedtls_aes_setkey_enc(&aes, derived_key_B, 256);
+    mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_ENCRYPT, 48, iv_copy, payload_B, encrypted_B);
+    mbedtls_aes_free(&aes);
+    
+    // 7. Write slot B to file
+    fs::File keyFile = LittleFS.open(DEVICE_KEY_FILE, "r+");
+    if (!keyFile) {
+        LOG_ERROR("CryptoManager", "Failed to open device key file for secondary slot write");
+        secure_memzero(derived_key_B, sizeof(derived_key_B));
+        secure_memzero(payload_B, sizeof(payload_B));
+        secure_memzero(device_key_B, sizeof(device_key_B));
+        return false;
+    }
+    
+    keyFile.seek(SLOT_B_OFFSET);
+    keyFile.write(salt_B, 16);
+    keyFile.write(iv_B, 16);
+    keyFile.write(encrypted_B, 48);
+    keyFile.close();
+    
+    // 8. Write Space B sentinel — proves provisioning without explicit flag
+    String sentinelPath = deriveSpaceBSentinelPath();
+    fs::File sf = LittleFS.open(sentinelPath, "w");
+    if (sf) {
+        sf.print("{}");  // minimal valid content
+        sf.close();
+        LOG_DEBUG("CryptoManager", "Space B sentinel written: " + sentinelPath);
+    } else {
+        LOG_WARNING("CryptoManager", "Failed to write configuration marker");
+    }
+    
+    // Clean up sensitive data
+    secure_memzero(derived_key_B, sizeof(derived_key_B));
+    secure_memzero(payload_B, sizeof(payload_B));
+    secure_memzero(device_key_B, sizeof(device_key_B));
+    
+    LOG_INFO("CryptoManager", "Secondary slot initialized successfully");
+    return true;
+}
+
+bool CryptoManager::wipeHiddenSpace() {
+    LOG_INFO("CryptoManager", "Clearing secondary slot...");
+    
+    // 1. Overwrite slot B with random data
+    uint8_t random_data[80];
+    secureRandom(random_data, 80);
+    
+    fs::File keyFile = LittleFS.open(DEVICE_KEY_FILE, "r+");
+    if (!keyFile) {
+        LOG_ERROR("CryptoManager", "Failed to open device key file for secondary slot clear");
+        return false;
+    }
+    
+    keyFile.seek(SLOT_B_OFFSET);
+    keyFile.write(random_data, 80);
+    keyFile.close();
+    
+    // 3. Delete all Space B data files (HMAC-derived paths)
+    // We must derive Space B paths using the current _deviceKey (Space B key)
+    // BEFORE we wipe it from memory
+    const char* logicalNames[] = {
+        "keys", "passwords", "wifi", "session",
+        "ble_pin", "device_ble_pin", "duress_pin", "web_admin", "pin_config", "sentinel", "theme", "startup_mode", "hid_mode", "boot_mode"
+    };
+    
+    for (const char* name : logicalNames) {
+        uint8_t hmac[32];
+        
+        // Compute HMAC-SHA256(deviceKey_B, logicalName) - same as initSpacePaths()
+        mbedtls_md_context_t md_ctx;
+        mbedtls_md_init(&md_ctx);
+        mbedtls_md_setup(&md_ctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), 1);
+        mbedtls_md_hmac_starts(&md_ctx, _deviceKey, 32);
+        mbedtls_md_hmac_update(&md_ctx, (const uint8_t*)name, strlen(name));
+        mbedtls_md_hmac_finish(&md_ctx, hmac);
+        mbedtls_md_free(&md_ctx);
+        
+        // Take first 8 hex chars (4 bytes) - same as initSpacePaths()
+        char hexBuf[9];
+        snprintf(hexBuf, sizeof(hexBuf), "%02x%02x%02x%02x",
+                 hmac[0], hmac[1], hmac[2], hmac[3]);
+        
+        // Build path: /<hex>.enc (or .bin for sentinel)
+        String filePath;
+        if (strcmp(name, "sentinel") == 0) {
+            filePath = String("/") + hexBuf + ".bin";
+        } else {
+            filePath = String("/") + hexBuf + ".enc";
+        }
+        
+        if (LittleFS.exists(filePath)) {
+            LittleFS.remove(filePath);
+            LOG_INFO("CryptoManager", "Deleted alternate slot file: " + filePath);
+        }
+    }
+    
+    // Also delete shared cache and network preferences
+    if (LittleFS.exists("/.conn_cache")) {
+        LittleFS.remove("/.conn_cache");
+        LOG_INFO("CryptoManager", "Deleted shared WiFi cache");
+    }
+    
+    if (LittleFS.exists(SPACE_FLAGS_FILE)) {
+        LittleFS.remove(SPACE_FLAGS_FILE);
+        LOG_INFO("CryptoManager", "Deleted network preferences file");
+    }
+    
+    LOG_INFO("CryptoManager", "Secondary slot files cleared completely");
+    
+    // 4. Clear device key from memory and reset state
+    wipeDeviceKey();
+    _activeSpace = ActiveSpace::NONE;
+    _hiddenSpaceProvisioned = false;
+    _shareWifiWithHiddenSpace = false;
+    
+    LOG_INFO("CryptoManager", "Secondary slot cleared successfully");
+    return true;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SPACE-AWARE FILE PATH DERIVATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+void CryptoManager::initSpacePaths() {
+    LOG_INFO("CryptoManager", "Initializing space-aware file paths for Space " + 
+             String(_activeSpace == ActiveSpace::A ? "A" : (_activeSpace == ActiveSpace::B ? "B" : "NONE")));
+    
+    _spacePaths.clear();
+    
+    if (_activeSpace == ActiveSpace::A) {
+        // Space A: use original paths from config.h
+        _spacePaths["keys"] = KEYS_FILE;                          // "/keys.json.enc"
+        _spacePaths["passwords"] = PASSWORD_FILE;                 // "/passwords.json.enc"
+        _spacePaths["wifi"] = "/wifi_config.json.enc";
+        _spacePaths["session"] = "/session.json.enc";
+        _spacePaths["ble_pin"] = "/ble_pin.json.enc";
+        _spacePaths["device_ble_pin"] = "/device_ble_pin.json.enc";
+        _spacePaths["duress_pin"] = "/duress_pin.hash";
+        _spacePaths["web_admin"] = "/web_admin.json";
+        _spacePaths["pin_config"] = "/pin_config.json";
+        _spacePaths["sentinel"] = "/sentinel.bin";                // Space A sentinel (unused)
+        _spacePaths["theme"] = "/theme_pref.json";
+        _spacePaths["startup_mode"] = "/startup_pref.json";
+        _spacePaths["hid_mode"] = "/hid_mode.json";
+        _spacePaths["boot_mode"] = "/boot_mode.json";
+        
+        LOG_DEBUG("CryptoManager", "Space A paths initialized (using original paths)");
+        
+    } else if (_activeSpace == ActiveSpace::B) {
+        // Space B: derive paths from HMAC-SHA256(deviceKey_B, logicalName)
+        const char* logicalNames[] = {
+            "keys", "passwords", "wifi", "session",
+            "ble_pin", "device_ble_pin", "duress_pin", "web_admin", "pin_config", "sentinel", "theme", "startup_mode", "hid_mode", "boot_mode"
+        };
+        
+        for (const char* name : logicalNames) {
+            uint8_t hmac[32];
+            
+            // Compute HMAC-SHA256(deviceKey_B, logicalName)
+            mbedtls_md_context_t md_ctx;
+            mbedtls_md_init(&md_ctx);
+            mbedtls_md_setup(&md_ctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), 1);
+            mbedtls_md_hmac_starts(&md_ctx, _deviceKey, 32);
+            mbedtls_md_hmac_update(&md_ctx, (const uint8_t*)name, strlen(name));
+            mbedtls_md_hmac_finish(&md_ctx, hmac);
+            mbedtls_md_free(&md_ctx);
+            
+            // Take first 8 hex chars (4 bytes)
+            char hexBuf[9];
+            snprintf(hexBuf, sizeof(hexBuf), "%02x%02x%02x%02x",
+                     hmac[0], hmac[1], hmac[2], hmac[3]);
+            
+            // Build path: /<hex>.enc (or .bin for sentinel)
+            if (strcmp(name, "sentinel") == 0) {
+                _spacePaths[name] = String("/") + hexBuf + ".bin";
+            } else {
+                _spacePaths[name] = String("/") + hexBuf + ".enc";
+            }
+            
+            LOG_DEBUG("CryptoManager", "Space B path: " + String(name) + " -> " + _spacePaths[name]);
+        }
+        
+        LOG_INFO("CryptoManager", "Alternate slot paths initialized (HMAC-derived, indistinguishable from random)");
+    }
+}
+
+String CryptoManager::getSpacePath(const char* logicalName) const {
+    auto it = _spacePaths.find(logicalName);
+    if (it != _spacePaths.end()) {
+        return it->second;
+    }
+    
+    // Fallback — should never happen if initSpacePaths() was called
+    LOG_WARNING("CryptoManager", "getSpacePath: logical name '" + String(logicalName) + 
+                "' not found in _spacePaths, using fallback");
+    return String("/") + logicalName + ".enc";
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SPACE B SENTINEL PATH DERIVATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+String CryptoManager::deriveSpaceBSentinelPath() {
+    // Derive Space B sentinel path using HMAC-SHA256(_deviceKey, "sentinel")
+    // Same logic as initSpacePaths() Space B branch
+    // Can be called from Space A context using Space A's _deviceKey
+    
+    uint8_t hmac[32];
+    mbedtls_md_context_t ctx;
+    mbedtls_md_init(&ctx);
+    mbedtls_md_setup(&ctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), 1);
+    mbedtls_md_hmac_starts(&ctx, _deviceKey, 32);
+    const char* name = "sentinel";
+    mbedtls_md_hmac_update(&ctx, (const uint8_t*)name, strlen(name));
+    mbedtls_md_hmac_finish(&ctx, hmac);
+    mbedtls_md_free(&ctx);
+    
+    // Take first 4 bytes as hex (8 chars) + .bin extension
+    char hexPath[32];
+    snprintf(hexPath, sizeof(hexPath), "/%02x%02x%02x%02x.bin",
+             hmac[0], hmac[1], hmac[2], hmac[3]);
+    
+    return String(hexPath);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SPACE FLAGS MANAGEMENT (/.net_prefs encrypted file)
+// ═══════════════════════════════════════════════════════════════════════════
+
+bool CryptoManager::saveSpaceFlags() {
+    if (!_isKeyInitialized) {
+        LOG_ERROR("CryptoManager", "Cannot save network preferences: device key not initialized");
+        return false;
+    }
+    
+    LOG_DEBUG("CryptoManager", "Saving network preferences: share_wifi=" + String(_shareWifiWithHiddenSpace));
+    
+    // 1. Build plaintext: [share_wifi:1][padding:15] (hidden_provisioned removed)
+    uint8_t plaintext[16];
+    memset(plaintext, 0, 16);
+    plaintext[0] = _shareWifiWithHiddenSpace ? 0x01 : 0x00;
+    // bytes 1-15 remain zero (padding)
+    
+    // 2. Generate deterministic IV from device key (XOR with 0x5A)
+    uint8_t iv[16];
+    memcpy(iv, _deviceKey, 16);
+    for (int i = 0; i < 16; i++) {
+        iv[i] ^= 0x5A;
+    }
+    
+    // 3. Encrypt with AES-256-CBC
+    uint8_t ciphertext[16];
+    mbedtls_aes_context aes;
+    mbedtls_aes_init(&aes);
+    mbedtls_aes_setkey_enc(&aes, _deviceKey, 256);
+    mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_ENCRYPT, 16, iv, plaintext, ciphertext);
+    mbedtls_aes_free(&aes);
+    
+    // 4. Write to file
+    fs::File file = LittleFS.open(SPACE_FLAGS_FILE, "w");
+    if (!file) {
+        LOG_ERROR("CryptoManager", "Failed to open network preferences file for writing");
+        secure_memzero(plaintext, sizeof(plaintext));
+        return false;
+    }
+    
+    file.write(ciphertext, 16);
+    file.close();
+    
+    secure_memzero(plaintext, sizeof(plaintext));
+    LOG_INFO("CryptoManager", "Network preferences saved successfully");
+    return true;
+}
+
+bool CryptoManager::loadSpaceFlags() {
+    if (!_isKeyInitialized) {
+        LOG_ERROR("CryptoManager", "Cannot load space flags: device key not initialized");
+        return false;
+    }
+    
+    // Check hidden space provisioning via sentinel file (HMAC-derived path)
+    String sentinelPath = deriveSpaceBSentinelPath();
+    _hiddenSpaceProvisioned = LittleFS.exists(sentinelPath);
+    LOG_DEBUG("CryptoManager", _hiddenSpaceProvisioned ? 
+              "Hidden space detected via sentinel: " + sentinelPath : 
+              "No hidden space (sentinel not found)");
+    
+    // If /.net_prefs doesn't exist, use defaults (wifi not shared)
+    if (!LittleFS.exists(SPACE_FLAGS_FILE)) {
+        LOG_DEBUG("CryptoManager", "Network preferences file not found, using defaults");
+        _shareWifiWithHiddenSpace = false;
+        return true;
+    }
+    
+    // 1. Read encrypted data
+    fs::File file = LittleFS.open(SPACE_FLAGS_FILE, "r");
+    if (!file) {
+        LOG_ERROR("CryptoManager", "Failed to open network preferences file for reading");
+        return false;
+    }
+    
+    if (file.size() != 16) {
+        LOG_ERROR("CryptoManager", "Invalid network preferences file size: " + String(file.size()));
+        file.close();
+        return false;
+    }
+    
+    uint8_t ciphertext[16];
+    file.read(ciphertext, 16);
+    file.close();
+    
+    // 2. Generate deterministic IV from device key (XOR with 0x5A)
+    uint8_t iv[16];
+    memcpy(iv, _deviceKey, 16);
+    for (int i = 0; i < 16; i++) {
+        iv[i] ^= 0x5A;
+    }
+    
+    // 3. Decrypt with AES-256-CBC
+    uint8_t plaintext[16];
+    mbedtls_aes_context aes;
+    mbedtls_aes_init(&aes);
+    mbedtls_aes_setkey_dec(&aes, _deviceKey, 256);
+    mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_DECRYPT, 16, iv, ciphertext, plaintext);
+    mbedtls_aes_free(&aes);
+    
+    // 4. Extract flags (only share_wifi now, hidden_provisioned removed)
+    _shareWifiWithHiddenSpace = (plaintext[0] == 0x01);
+    
+    secure_memzero(plaintext, sizeof(plaintext));
+    
+    LOG_INFO("CryptoManager", "Network preferences loaded: share_wifi=" + String(_shareWifiWithHiddenSpace));
+    return true;
+}
+
+bool CryptoManager::setShareWifiWithHiddenSpace(bool share) {
+    if (!_isKeyInitialized) {
+        LOG_ERROR("CryptoManager", "Cannot set WiFi sharing: device key not initialized");
+        return false;
+    }
+    
+    LOG_INFO("CryptoManager", "Setting WiFi sharing with alternate slot: " + String(share));
+    _shareWifiWithHiddenSpace = share;
+    return saveSpaceFlags();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CHIP-DERIVED SHARED KEY (for WiFi sharing between spaces)
+// ═══════════════════════════════════════════════════════════════════════════
+
+void CryptoManager::deriveChipSharedKey(uint8_t* outKey32) {
+    // Hardware chip ID — constant across reboots and spaces
+    uint64_t chipId = ESP.getEfuseMac();
+    uint8_t seed[8];
+    memcpy(seed, &chipId, 8);
+    
+    // Static salt for domain separation
+    const uint8_t salt[16] = {
+        0x57, 0x69, 0x46, 0x69, 0x53, 0x68, 0x61, 0x72,
+        0x65, 0x64, 0x4B, 0x65, 0x79, 0x00, 0x00, 0x01
+    };
+    
+    // PBKDF2 with 1000 iterations (fast — key is hardware-derived, not user secret)
+    mbedtls_md_context_t ctx;
+    mbedtls_md_init(&ctx);
+    mbedtls_md_setup(&ctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), 1);
+    mbedtls_pkcs5_pbkdf2_hmac(&ctx, seed, 8, salt, 16, 1000, 32, outKey32);
+    mbedtls_md_free(&ctx);
+}
+
+String CryptoManager::encryptForSharedCache(const String& plaintext) {
+    LOG_DEBUG("CryptoManager", "Encrypting data for shared cache with chip-derived key");
+    
+    // Derive chip-based shared key
+    uint8_t chipKey[32];
+    deriveChipSharedKey(chipKey);
+    
+    // Generate random IV
+    uint8_t iv[16];
+    secureRandom(iv, 16);
+    uint8_t iv_copy[16];
+    memcpy(iv_copy, iv, 16);
+    
+    // Pad plaintext (PKCS7)
+    size_t plain_len = plaintext.length();
+    size_t padding_len = 16 - (plain_len % 16);
+    size_t padded_len = plain_len + padding_len;
+    std::vector<uint8_t> padded_input(padded_len);
+    memcpy(padded_input.data(), plaintext.c_str(), plain_len);
+    for(size_t i = 0; i < padding_len; i++) {
+        padded_input[plain_len + i] = padding_len;
+    }
+    
+    // Encrypt with AES-256-CBC
+    std::vector<uint8_t> ciphertext(padded_len);
+    mbedtls_aes_context aes;
+    mbedtls_aes_init(&aes);
+    mbedtls_aes_setkey_enc(&aes, chipKey, 256);
+    mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_ENCRYPT, padded_len, iv_copy, padded_input.data(), ciphertext.data());
+    mbedtls_aes_free(&aes);
+    
+    // Combine IV + ciphertext
+    std::vector<uint8_t> combined(16 + padded_len);
+    memcpy(combined.data(), iv, 16);
+    memcpy(combined.data() + 16, ciphertext.data(), padded_len);
+    
+    // Clean up sensitive data
+    secure_memzero(chipKey, sizeof(chipKey));
+    std::fill(padded_input.begin(), padded_input.end(), 0);
+    
+    // Return base64
+    return base64Encode(combined.data(), combined.size());
+}
+
+String CryptoManager::decryptFromSharedCache(const String& ciphertext) {
+    LOG_DEBUG("CryptoManager", "Decrypting data from shared cache with chip-derived key");
+    
+    // Decode base64
+    std::vector<uint8_t> combined = base64Decode(ciphertext);
+    if (combined.size() < 16 || (combined.size() - 16) % 16 != 0) {
+        LOG_ERROR("CryptoManager", "Invalid shared cache ciphertext format");
+        return "";
+    }
+    
+    // Extract IV and ciphertext
+    uint8_t iv[16];
+    memcpy(iv, combined.data(), 16);
+    size_t encrypted_len = combined.size() - 16;
+    std::vector<uint8_t> encrypted_data(encrypted_len);
+    memcpy(encrypted_data.data(), combined.data() + 16, encrypted_len);
+    
+    // Derive chip-based shared key
+    uint8_t chipKey[32];
+    deriveChipSharedKey(chipKey);
+    
+    // Decrypt with AES-256-CBC
+    std::vector<uint8_t> decrypted_padded(encrypted_len);
+    mbedtls_aes_context aes;
+    mbedtls_aes_init(&aes);
+    mbedtls_aes_setkey_dec(&aes, chipKey, 256);
+    mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_DECRYPT, encrypted_len, iv, encrypted_data.data(), decrypted_padded.data());
+    mbedtls_aes_free(&aes);
+    
+    // Unpad (PKCS7)
+    if(decrypted_padded.empty()) {
+        secure_memzero(chipKey, sizeof(chipKey));
+        return "";
+    }
+    uint8_t padding_len = decrypted_padded.back();
+    if (padding_len > 16 || padding_len == 0 || padding_len > decrypted_padded.size()) {
+        LOG_ERROR("CryptoManager", "Shared cache decryption failed: Invalid padding");
+        secure_memzero(chipKey, sizeof(chipKey));
+        return "";
+    }
+    for(size_t i = 0; i < padding_len; ++i) {
+        if (decrypted_padded[decrypted_padded.size() - 1 - i] != padding_len) {
+            LOG_ERROR("CryptoManager", "Shared cache decryption failed: Padding verification failed");
+            secure_memzero(chipKey, sizeof(chipKey));
+            return "";
+        }
+    }
+    
+    size_t plain_len = decrypted_padded.size() - padding_len;
+    String result((char*)decrypted_padded.data(), plain_len);
+    
+    // Clean up sensitive data
+    secure_memzero(chipKey, sizeof(chipKey));
+    std::fill(decrypted_padded.begin(), decrypted_padded.end(), 0);
+    
+    return result;
 }

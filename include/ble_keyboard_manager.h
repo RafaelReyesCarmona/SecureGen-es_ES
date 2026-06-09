@@ -65,6 +65,7 @@ public:
     void release();
     void print(const String& text);
     void sendPassword(const char* password);
+    void sendEnter();
     
     // Проверки состояния
     bool isConnected() const { return deviceConnected; }

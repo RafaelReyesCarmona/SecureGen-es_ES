@@ -3,11 +3,19 @@
 
 #include <Arduino.h>
 #include <vector>
+#include <map>
 #include "LittleFS.h"
 #include "mbedtls/entropy.h"
 #include "mbedtls/ctr_drbg.h"
 
 #define DEVICE_KEY_FILE "/device.key"
+
+// ActiveSpace enum for dual-slot hidden volume support
+enum class ActiveSpace {
+    NONE = -1,
+    A = 0,
+    B = 1
+};
 
 class CryptoManager {
 public:
@@ -29,6 +37,10 @@ public:
     // --- New Password-based Encryption for Import/Export ---
     String encryptWithPassword(const String& plaintext, const String& password);
     String decryptWithPassword(const String& encryptedJson, const String& password);
+    
+    // --- NEW: Chip-derived shared encryption (for WiFi sharing between spaces) ---
+    String encryptForSharedCache(const String& plaintext);
+    String decryptFromSharedCache(const String& ciphertext);
     
     // Session ID generation
     String generateSecureSessionId();
@@ -101,6 +113,36 @@ public:
     
     // Wipe device key from memory
     void wipeDeviceKey();
+    
+    // --- NEW: Duress PIN Collision Detection ---
+    // Check if a PIN would unlock a specific slot without side effects
+    // Returns true if PIN can decrypt the slot (MAGIC matches)
+    // Does NOT modify _deviceKey or _activeSpace
+    bool wouldUnlockSlot(const String& pin, size_t slotOffset);
+    
+    // --- NEW: Hidden Volume (Dual-Slot) Support ---
+    // Get currently active space (A, B, or NONE)
+    ActiveSpace getActiveSpace() const { return _activeSpace; }
+    
+    // Check if hidden space (slot B) is provisioned
+    bool isHiddenSpaceProvisioned();
+    
+    // Create hidden space (slot B) with a different PIN - must be called from Space A
+    bool createHiddenSpace(const String& pin);
+    
+    // Wipe hidden space (slot B) - must be called from Space B
+    bool wipeHiddenSpace();
+    
+    // --- NEW: Space-Aware File Paths ---
+    // Get the actual filesystem path for a logical file name based on active space
+    String getSpacePath(const char* logicalName) const;
+    
+    // Initialize space-specific file paths (called after successful unlock)
+    void initSpacePaths();
+    
+    // --- NEW: WiFi Sharing with Hidden Space ---
+    bool isWifiSharedWithHiddenSpace() const { return _shareWifiWithHiddenSpace; }
+    bool setShareWifiWithHiddenSpace(bool share);
 
 private:
     // Secure memory zeroing — see include/secure_utils.h
@@ -114,6 +156,14 @@ private:
     mbedtls_entropy_context _entropy;
     mbedtls_ctr_drbg_context _drbg;
     bool _isDrbgInitialized;
+    
+    // --- NEW: Dual-slot state tracking ---
+    ActiveSpace _activeSpace;
+    bool _hiddenSpaceProvisioned;
+    bool _shareWifiWithHiddenSpace;
+    
+    // --- NEW: Space-aware file path mapping ---
+    std::map<String, String> _spacePaths;  // logicalName → actual LittleFS path
 
     void generateAndSaveKey();
     void loadKey();
@@ -124,6 +174,22 @@ private:
     void generateNewDeviceKey();
     bool saveDeviceKeyEncrypted(const uint8_t* salt, const uint8_t* encryptedKey);
     bool saveDeviceKeyUnencrypted();
+    
+    // --- NEW: Dual-slot internal helpers ---
+    static constexpr uint8_t DEVICE_KEY_MAGIC[4] = {0xA3, 0x7F, 0x2C, 0x91};
+    static constexpr int SLOT_A_OFFSET = 0;
+    static constexpr int SLOT_B_OFFSET = 80;
+    static constexpr int KEY_FILE_SIZE = 256;
+    static constexpr char SPACE_FLAGS_FILE[] = "/.net_prefs";
+    
+    bool tryDecryptSlot(const String& pin, int slotOffset);
+    bool tryDecryptSlotDry(const String& pin, size_t slotOffset, uint8_t* outKey);
+    bool saveSpaceFlags();
+    bool loadSpaceFlags();
+    String deriveSpaceBSentinelPath();
+    
+    // --- NEW: Chip-derived shared key helper ---
+    void deriveChipSharedKey(uint8_t* outKey32);
 };
 
 #endif // CRYPTO_MANAGER_H
