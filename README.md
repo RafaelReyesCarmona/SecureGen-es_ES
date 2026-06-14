@@ -334,6 +334,7 @@ pio run -e lilygo-t-display-s3 -t upload
 Here are some awesome reviews and community projects featuring this ESP32 device:
 
 *   [Video Review by Linuxndroid](https://www.youtube.com/shorts/3rvrnMr8oQQ) — A detailed look into the hardware setup and features.
+*   [Step-to-Step Guide by Linuxndroid](https://www.youtube.com/watch?v=-UyNTweQpgE) — A detailed look into the hardware setup and features.
 
 ---
 
