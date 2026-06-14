@@ -10,6 +10,7 @@
 [![PlatformIO](https://img.shields.io/badge/PlatformIO-Compatible-orange.svg)](https://platformio.org/)
 [![ESP32](https://img.shields.io/badge/ESP32-Powered-blue.svg)](https://www.espressif.com/)
 
+[![Instagram](https://img.shields.io/badge/Instagram-Follow-E4405F?logo=instagram&logoColor=white)](https://www.instagram.com/securegen/)
 [![YouTube](https://img.shields.io/badge/YouTube-Demo-red?logo=youtube)](https://www.youtube.com/watch?v=YTVQBwgok_E)
 [![Hackster](https://img.shields.io/badge/Hackster.io-Featured-00979D?logo=hackster)](https://www.hackster.io/makepkg/securegen-open-source-totp-authenticator-password-manager-c350d6)
 [![Dev.to](https://img.shields.io/badge/Dev.to-Blog-0A0A0A?logo=dev.to)](https://dev.to/makepkg)
@@ -342,6 +343,7 @@ Here are some awesome reviews and community projects featuring this ESP32 device
 
 - **Issues:** [GitHub Issues](https://github.com/makepkg/SecureGen/issues)
 - **Discussions:** [GitHub Discussions](https://github.com/makepkg/SecureGen/discussions)
+- **Instagram:** [securegen](https://www.instagram.com/securegen/) — Official device account (photos, hardware updates, and community highlights)
 - **YouTube:** [Demo & Tutorials](https://www.youtube.com/watch?v=YTVQBwgok_E)
 - **Dev.to:** [Technical Articles](https://dev.to/makepkg)
 - **Twitter/X:** [@makepkg](https://x.com/makepkg_)
