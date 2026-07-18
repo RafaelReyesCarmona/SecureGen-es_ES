@@ -2798,10 +2798,11 @@ function generatePassword() {
     
     // Character sets for different types
     const lowercase = 'abcdefghijklmnopqrstuvwxyz';
-    const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    const numbers = '0123456789';
-    const specialChars = '!@#$%^&*()_+-=[]{}|;:,.<>?~`\'"/';
-    
+    const uppercase = 'ABCDEFGHJKLMNOPQRSTUVWXYZ'; // Without 'I'.
+    const numbers = '23456789'; // Without '0','1'
+    const specialChars = '!@#$%&/()=?,;.:-_';
+    //const specialChars = '!@#$%^&*()_+-=[]{}|;:,.<>?~`\'"/';
+
     // Ensure at least one character from each type for strong passwords
     let password = '';
     const allChars = lowercase + uppercase + numbers + specialChars;
@@ -2955,9 +2956,10 @@ function generatePasswordForEdit() {
     const length = 14; // Стандартная длина
     
     const lowercase = 'abcdefghijklmnopqrstuvwxyz';
-    const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    const numbers = '0123456789';
-    const specialChars = '!@#$%^&*()_+-=[]{}|;:,.<>?~`\'"/';
+    const uppercase = 'ABCDEFGHJKLMNOPQRSTUVWXYZ'; // Without 'I'.
+    const numbers = '23456789'; // Without '0','1'
+    const specialChars = '!@#$%&/()=?,;.:-_';
+    //const specialChars = '!@#$%^&*()_+-=[]{}|;:,.<>?~`\'"/';
     
     let password = '';
     const allChars = lowercase + uppercase + numbers + specialChars;

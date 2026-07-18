@@ -1,10 +1,50 @@
+/*
+  Keyboard.h
+
+  Copyright (c) 2015, Arduino LLC
+  Original code (pre-library): Copyright (c) 2011, Peter Barrett
+
+  This library is free software; you can redistribute it and/or
+  modify it under the terms of the GNU Lesser General Public
+  License as published by the Free Software Foundation; either
+  version 2.1 of the License, or (at your option) any later version.
+
+  This library is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+  Lesser General Public License for more details.
+
+  You should have received a copy of the GNU Lesser General Public
+  License along with this library; if not, write to the Free Software
+  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+*/
+
 #pragma once
+#include "Print.h"
+#include "USBHID.h"
+#if CONFIG_TINYUSB_HID_ENABLED
 
-#ifdef BOARD_HAS_USB_HID
+#include "esp_event.h"
 
-#include <Arduino.h>
-#include "USB.h"
-#include "USBHIDKeyboard.h"
+ESP_EVENT_DECLARE_BASE(ARDUINO_USB_HID_KEYBOARD_EVENTS);
+
+typedef enum {
+    ARDUINO_USB_HID_KEYBOARD_ANY_EVENT = ESP_EVENT_ANY_ID,
+    ARDUINO_USB_HID_KEYBOARD_LED_EVENT = 0,
+    ARDUINO_USB_HID_KEYBOARD_MAX_EVENT,
+} arduino_usb_hid_keyboard_event_t;
+
+typedef union {
+    struct {
+            uint8_t numlock:1;
+            uint8_t capslock:1;
+            uint8_t scrolllock:1;
+            uint8_t compose:1;
+            uint8_t kana:1;
+            uint8_t reserved:3;
+    };
+    uint8_t leds;
+} arduino_usb_hid_keyboard_event_data_t;
 
 #define KEY_LEFT_CTRL   0x80
 #define KEY_LEFT_SHIFT  0x81
@@ -14,8 +54,6 @@
 #define KEY_RIGHT_SHIFT 0x85
 #define KEY_RIGHT_ALT   0x86  // AltGr (Right Alt) Key
 #define KEY_RIGHT_GUI   0x87
-
-#define NO_KEY_MOD      0x00
 
 #define KEY_UP_ARROW     0xDA
 #define KEY_DOWN_ARROW   0xD9
@@ -93,26 +131,41 @@
 #define ISO_KEY         0x64
 #define ISO_REPLACEMENT 0x32
 
-//#include "USBHIDKeyboard_Layout.h"
-//#include "USBHIDKeyboard-v3.h"
+//  Low level key report: up to 6 keys and shift, ctrl etc at once
+typedef struct
+{
+  uint8_t modifiers;
+  uint8_t reserved;
+  uint8_t keys[6];
+} KeyReport;
 
-class UsbHidManager {
-public:
-  UsbHidManager();
-  bool begin();
-  void end();
-  bool isConnected();
-  void sendPassword(const char* password);
-  void sendEnter();
-  void sendKey(char k, uint8_t m);
-
+class USBHIDKeyboard: public USBHIDDevice, public Print
+{
 private:
-  USBHIDKeyboard _keyboard;
-  bool _started = false;
-  /*
-  uint8_t charToHidKey(char c);
-  uint8_t charToModifier(char c);
-  */
+    USBHID hid;
+    KeyReport _keyReport;
+public:
+    USBHIDKeyboard(void);
+    void begin(void);
+    void end(void);
+    size_t write(uint8_t k);
+    size_t writeRaw(uint8_t k);
+    size_t write(const uint8_t *buffer, size_t size);
+    size_t press(uint8_t k);
+    size_t release(uint8_t k);
+    void releaseAll(void);
+    void sendReport(KeyReport* keys);
+
+    //raw functions work with TinyUSB's HID_KEY_* macros
+    size_t pressRaw(uint8_t k);
+    size_t releaseRaw(uint8_t k);
+
+    void onEvent(esp_event_handler_t callback);
+    void onEvent(arduino_usb_hid_keyboard_event_t event, esp_event_handler_t callback);
+
+    // internal use
+    uint16_t _onGetDescriptor(uint8_t* buffer);
+    void _onOutput(uint8_t report_id, const uint8_t* buffer, uint16_t len);
 };
 
-#endif // BOARD_HAS_USB_HID
+#endif
