@@ -1,24 +1,16 @@
-# ESP32 T-Display Multifunctional Security Device
+# Dispositivo de Seguridad Multifuncional ESP32 T-Display/S3
 
 <div align="center">
 
-**Open-source hardware security device featuring TOTP Authenticator and Password Manager with BLE/USB HID**
+**Este es un folk del repositorio https://github.com/makepkg/SecureGen**
 
-*Supports T-Display ESP32 and T-Display-S3*
+**Open-source hardware security device featuring TOTP Authenticator and Password Manager with BLE/USB HID es_ES Layout**
+
+*Soporta T-Display ESP32 y T-Display-S3 adaptado a teclado español y sin caracteres ambiguos en generador de claves*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PlatformIO](https://img.shields.io/badge/PlatformIO-Compatible-orange.svg)](https://platformio.org/)
 [![ESP32](https://img.shields.io/badge/ESP32-Powered-blue.svg)](https://www.espressif.com/)
-
-[![Instagram](https://img.shields.io/badge/Instagram-Follow-E4405F?logo=instagram&logoColor=white)](https://www.instagram.com/securegen/)
-[![YouTube](https://img.shields.io/badge/YouTube-Demo-red?logo=youtube)](https://www.youtube.com/watch?v=YTVQBwgok_E)
-[![Hackster](https://img.shields.io/badge/Hackster.io-Featured-00979D?logo=hackster)](https://www.hackster.io/makepkg/securegen-open-source-totp-authenticator-password-manager-c350d6)
-[![Dev.to](https://img.shields.io/badge/Dev.to-Blog-0A0A0A?logo=dev.to)](https://dev.to/makepkg)
-[![Product Hunt](https://img.shields.io/badge/Product_Hunt-Launched-DA552F?logo=producthunt&logoColor=white)](https://www.producthunt.com/products/securegen-2)
-[![Flash Online](https://img.shields.io/badge/Flash-Online-brightgreen?logo=espressif)](https://makepkg.github.io/SecureGen/flash)
-[![Languages](https://img.shields.io/badge/Languages-EN%20%7C%20RU%20%7C%20DE%20%7C%20ZH%20%7C%20ES-informational)](#)
-
-[Video Demo](#-video-demo) • [Features](#-key-features) • [Installation](#-quick-start) • [Documentation](#-documentation) • [Security](#-security) • [Support](#-support)
 
 </div>
 
@@ -148,7 +140,7 @@
 
 ---
 
-## 🎥 Video Demo
+## 🎥 Video
 
 <div align="center">
 
@@ -179,7 +171,7 @@
 ### 🔑 Password Manager
 - Offline encrypted vault — works without any network connection
 - **BLE HID keyboard** (ESP32 & S3): types passwords directly into any device, no clipboard
-- **USB HID keyboard** (S3 only): native USB connection, no pairing needed
+- **USB HID keyboard** (S3 only): native USB connection, no pairing needed, **es_ES Layout**
 - PIN protection for BLE transmission
 - Encrypted export/import for backup and migration
 
@@ -194,7 +186,8 @@
 ### 🌐 Web Management Interface
 - Runs on the device itself — no cloud, no external servers
 - Full TOTP and password management from any browser
-- Password generator with complexity settings
+- Password generator with complexity settings without ambiguos characters (I, 1, 0)
+- Alphabet keys: "**abcdefghijklmnopqrstuvwxyzABCDEFGHJKLMNOPQRSTUVWXYZ23456789!@#$%&/()=?,;.:-_**"
 - Three network modes: WiFi client, AP hotspot, or fully offline
 - Multilingual interface — English, Russian, German, Chinese (Simplified), and Spanish
 
@@ -261,14 +254,14 @@ Wake from sleep: press Button 2.
 - USB-C cable
 
 ### ⚡ No tools? Flash from browser
-[**→ Web Flasher**](https://makepkg.github.io/SecureGen/flash) — Chrome/Edge + USB, no install needed  
-[**→ User Guide**](https://makepkg.github.io/SecureGen/guide)  
-[**→ Decrypt Export Tool**](https://makepkg.github.io/SecureGen/tools)
+[**→ Web Flasher**](https://RafaelReyesCarmona.github.io/SecureGen-es_ES/flash) — Chrome/Edge + USB, no install needed  
+[**→ User Guide**](https://RafaelReyesCarmona.github.io/SecureGen-es_ES/guide)  
+[**→ Decrypt Export Tool**](https://RafaelReyesCarmona.github.io/SecureGen-es_ES/tools)
 
 ### Install
 
 ```bash
-git clone https://github.com/makepkg/SecureGen.git
+git clone https://github.com/RafaelReyesCarmona/SecureGen-es_ES.git
 cd SecureGen
 
 # Open in VS Code with PlatformIO extension
@@ -336,31 +329,6 @@ Here are some awesome reviews and community projects featuring this ESP32 device
 
 *   [Video Review by Linuxndroid](https://www.youtube.com/shorts/3rvrnMr8oQQ) — A detailed look into the hardware setup and features.
 *   [Step-to-Step Guide by Linuxndroid](https://www.youtube.com/watch?v=-UyNTweQpgE) — A detailed look into the hardware setup and features.
-
----
-
-## 🤝 Support & Community
-
-- **Issues:** [GitHub Issues](https://github.com/makepkg/SecureGen/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/makepkg/SecureGen/discussions)
-- **Instagram:** [securegen](https://www.instagram.com/securegen/) — Official device account (photos, hardware updates, and community highlights)
-- **YouTube:** [Demo & Tutorials](https://www.youtube.com/watch?v=YTVQBwgok_E)
-- **Dev.to:** [Technical Articles](https://dev.to/makepkg)
-- **Twitter/X:** [@makepkg](https://x.com/makepkg_)
-- **Hackster.io:** [Featured Project](https://www.hackster.io/makepkg/securegen-open-source-totp-authenticator-password-manager-c350d6)
-- **Product Hunt:** [Launch Page](https://www.producthunt.com/products/securegen-2)
-
-### Donations
-
-[![Sponsor](https://img.shields.io/badge/Sponsor-❤-red.svg)](https://github.com/sponsors/makepkg)
-
-**USDT BEP-20:** `0xd03499C9c6100Af624603b4D6fb185A65694745C`  
-
-**USDT TRC-20:** `TUAzeSrKeDYbt6HCs9PL6q1t5amHHdnnwR`
-
-**USDT SOLANA:** `2cecCCh8pzUNmEpjLQ3aa9sfPL5KXqANrmSfiiDWubCj`
-
-**⭐ Star this repo if you find it useful!**
 
 ---
 
