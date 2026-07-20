@@ -457,7 +457,7 @@ uint8_t BleKeyboardManager::charToHidKey(char c) {
     if (c == '+') return 0x2E; // Shift + =
     if (c == '{') return 0x2F; // Shift + [
     if (c == '}') return 0x30; // Shift + ]
-    if (c == '|') return 0x31; // Shift + \ -
+    if (c == '|') return 0x31; // Shift + '\'
     if (c == ':') return 0x33; // Shift + ;
     if (c == '"') return 0x34; // Shift + '
     if (c == '~') return 0x35; // Shift + `
@@ -489,7 +489,7 @@ uint8_t BleKeyboardManager::charToModifier(char c) {
     if (c == '+') return 0x02; // Shift + =
     if (c == '{') return 0x02; // Shift + [
     if (c == '}') return 0x02; // Shift + ]
-    if (c == '|') return 0x02; // Shift + \
+    if (c == '|') return 0x02; // Shift + '\'
     if (c == ':') return 0x02; // Shift + ;
     if (c == '"') return 0x02; // Shift + '
     if (c == '~') return 0x02; // Shift + `
