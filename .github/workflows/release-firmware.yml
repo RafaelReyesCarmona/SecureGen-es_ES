@@ -141,13 +141,13 @@ jobs:
               {
                 "chipFamily": "ESP32",
                 "parts": [
-                  { "path": "/SecureGen/firmware/merged-firmware-esp32.bin", "offset": 0 }
+                  { "path": "/SecureGen-es_ES/firmware/merged-firmware-esp32.bin", "offset": 0 }
                 ]
               },
               {
                 "chipFamily": "ESP32-S3",
                 "parts": [
-                  { "path": "/SecureGen/firmware/merged-firmware-s3.bin", "offset": 0 }
+                  { "path": "/SecureGen-es_ES/firmware/merged-firmware-s3.bin", "offset": 0 }
                 ]
               }
             ]
