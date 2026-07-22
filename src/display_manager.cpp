@@ -132,7 +132,17 @@ void DisplayManager::update() {
     drawTotpText(textToDraw);
 }
 
-void DisplayManager::initialize() {
+// Ранняя инициализация для splash screen (минимальная подготовка)
+void DisplayManager::initForSplash() {
+    if (!_started) init();
+    
+    tft.fillScreen(TFT_BLACK); // Очищаем экран чёрным для splash
+    tft.setTextDatum(MC_DATUM);
+}
+
+// Полная инициализация (для обычного UI)
+void DisplayManager::init() {
+  if (!_started) {
 #ifdef LCD_POWER_ON_PIN
     pinMode(LCD_POWER_ON_PIN, OUTPUT);
     digitalWrite(LCD_POWER_ON_PIN, HIGH);
@@ -140,6 +150,9 @@ void DisplayManager::initialize() {
 #endif
     tft.init();
     _started = true;
+
+    tft.fillScreen(_currentThemeColors->background_dark); 
+    tft.setTextDatum(MC_DATUM);
 
     // Apply display rotation from config (default: 1 = landscape, USB on right)
     uint8_t rotation = configManager.getDisplayRotation();
@@ -154,22 +167,6 @@ void DisplayManager::initialize() {
     ledcAttachPin(TFT_BL, 0);
     ledcWrite(0, 0);
 #endif
-}
-
-// Ранняя инициализация для splash screen (минимальная подготовка)
-void DisplayManager::initForSplash() {
-    if (!_started) initialize();
-    
-    tft.fillScreen(TFT_BLACK); // Очищаем экран чёрным для splash
-    tft.setTextDatum(MC_DATUM);
-}
-
-// Полная инициализация (для обычного UI)
-void DisplayManager::init() {
-    if (!_started) initialize();
-
-    tft.fillScreen(_currentThemeColors->background_dark); 
-    tft.setTextDatum(MC_DATUM);
 
     headerSprite.createSprite(tft.width(), 35);
     headerSprite.setTextDatum(MC_DATUM);
@@ -195,7 +192,7 @@ void DisplayManager::init() {
     _totpState = TotpState::IDLE;
     _lastDrawnTotpString = "";
     _totpContainerNeedsRedraw = true;
-
+  }
     schedule_next_update(this, &animationManager);
 }
 
