@@ -191,7 +191,7 @@
   * Lower case : **abcdefghijklmnopqrstuvwxyzñáéíóúäëïöüâêîôû**
   * Upper case : **ABCDEFGHJKLMNOPQRSTUVWXYZÑÁÉÍÓÚÄËÏÖÜÂÊÎÔÛ**, whitout I.
   * Numbers : **23456789** , whithout 0 and 1.
-  * Symbols: **!@#$%&/()=?,;.:-_**
+  * Symbols: **!@#$%&/()=?,;.:-_ºª**
 - Three network modes: WiFi client, AP hotspot, or fully offline
 - Multilingual interface — English, Russian, German, Chinese (Simplified), and Spanish
 
