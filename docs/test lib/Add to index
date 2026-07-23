@@ -1,0 +1,43 @@
+// Seleccionamos el campo de texto
+const CheckPasswordField = document.getElementById('password-value');
+
+// Escuchamos el evento keydown
+CheckPasswordField.addEventListener('keydown', function (event) {
+    const tecla = event.key;
+
+    // Regex de caracteres permitidos
+    const permitidos = /^[a-z2-9ABCDEFGHJKLMNOPQRSTUVWXYñÑáéíóúÁÉÍÓÚäëïöüÄËÏÖÜâêîôûÂÊÎÔÛ!@#$%&/()=?,;.:\-_º]$/;
+
+    // Lista de teclas especiales que sí se permiten
+    const especiales = [
+        "Backspace", "Tab", "Enter", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Delete", "Home", "End"
+    ];
+
+    // Si no es especial y no coincide con la regex, bloquear
+    if (!permitidos.test(tecla) && !especiales.includes(tecla)) {
+        event.preventDefault();
+        console.log(`Tecla no permitida: ${tecla}`);
+    }
+});
+
+// Seleccionamos el campo de texto
+const CheckPasswordField2 = document.getElementById('edit-password-value');
+
+// Escuchamos el evento keydown
+CheckPasswordField.addEventListener('keydown', function (event) {
+    const tecla = event.key;
+
+    // Regex de caracteres permitidos
+    const permitidos = /^[a-z2-9ABCDEFGHJKLMNOPQRSTUVWXYñÑáéíóúÁÉÍÓÚäëïöüÄËÏÖÜâêîôûÂÊÎÔÛ!@#$%&/()=?,;.:\-_º]$/;
+
+    // Lista de teclas especiales que sí se permiten
+    const especiales = [
+        "Backspace", "Tab", "Enter", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Delete", "Home", "End"
+    ];
+
+    // Si no es especial y no coincide con la regex, bloquear
+    if (!permitidos.test(tecla) && !especiales.includes(tecla)) {
+        event.preventDefault();
+        console.log(`Tecla no permitida: ${tecla}`);
+    }
+});
