@@ -187,11 +187,11 @@
 - Runs on the device itself — no cloud, no external servers
 - Full TOTP and password management from any browser
 - Password generator with complexity settings whithout ambiguos characters (I, 1, 0)
-- Alphabet keys: 
+- Alphabet es_ES Lauyout, keys: 
   * Lower case : **abcdefghijklmnopqrstuvwxyzñáéíóúäëïöüâêîôû**
   * Upper case : **ABCDEFGHJKLMNOPQRSTUVWXYZÑÁÉÍÓÚÄËÏÖÜÂÊÎÔÛ**, whitout I.
   * Numbers : **23456789** , whithout 0 and 1.
-  * Symbols: **!@#$%&/()=?,;.:-_ºª**
+  * Symbols: **!@#$%&/()=?,;.:-_**
 - Three network modes: WiFi client, AP hotspot, or fully offline
 - Multilingual interface — English, Russian, German, Chinese (Simplified), and Spanish
 
