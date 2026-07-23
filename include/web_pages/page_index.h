@@ -2032,7 +2032,7 @@ b){var c={},d;for(d=0;d<b.length;d++)void 0!==a[b[d]]&&(c[b[d]]=a[b[d]]);return 
                 <span class="password-generate" onclick="generatePasswordForEdit()" title="Generate Password">#</span>
                 <span class="password-toggle" onclick="togglePasswordVisibility('edit-password-value', this)">O</span>
             </div>
-            <div>    
+            <div> 
                 <small style="color: #b0b0b0; display: block; margin-top: 5px;">CharSet: "abcdefghijklmnñopqrstuvwxyzABCDEFGHJKLMNÑOPQRSTUVWXYZ"</small>
                 <small style="color: #b0b0b0; display: block; margin-top: 5px; margin-left: 40px;">"23456789!@#$%&/()=?,;.:-_áéíóúÁÉÍÓÚäëïöüÄËÏÖÜâêîôûÂÊÎÔÛ"</small>
             </div>
