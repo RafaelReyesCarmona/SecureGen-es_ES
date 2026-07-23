@@ -81,7 +81,7 @@ void UsbHidManager::sendPassword(const char* password) {
             //case 0xBA: sendKey('`',NO_KEY_MOD); break;      // key 'º'
             //case 0xAA: sendKey('`',KEY_RIGHT_SHIFT); break;  // key 'ª' special key for system.
           //} // end switch c2
-        } // end if
+        //} // end if
         switch(c) {
           case '@': sendKey('2',KEY_RIGHT_ALT); break;
           case '#': sendKey('3',KEY_RIGHT_ALT); break;

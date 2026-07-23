@@ -1460,6 +1460,10 @@ b){var c={},d;for(d=0;d<b.length;d++)void 0!==a[b[d]]&&(c[b[d]]=a[b[d]]);return 
                 <input type="text" id="password-value" name="password" class="user-activity" required>
                 <span class="password-generate" onclick="openPasswordGeneratorModal()" title="Generate Password">#</span>
             </div>
+            <div>
+                <small style="color: #b0b0b0; display: block; margin-top: 5px;">CharSet: "abcdefghijklmnñopqrstuvwxyzABCDEFGHJKLMNÑOPQRSTUVWXYZ"</small>
+                <small style="color: #b0b0b0; display: block; margin-top: 5px; margin-left: 40px;">"23456789!@#$%&/()=?,;.:-_áéíóúÁÉÍÓÚäëïöüÄËÏÖÜâêîôûÂÊÎÔÛ"</small>
+            </div>
             <div class="cat-selector-wrap">
                 <label data-i18n="passwords.cat.label">Category:</label>
                 <button type="button" class="cat-selector-btn" id="add-cat-btn"
@@ -2028,6 +2032,10 @@ b){var c={},d;for(d=0;d<b.length;d++)void 0!==a[b[d]]&&(c[b[d]]=a[b[d]]);return 
                 <span class="password-generate" onclick="generatePasswordForEdit()" title="Generate Password">#</span>
                 <span class="password-toggle" onclick="togglePasswordVisibility('edit-password-value', this)">O</span>
             </div>
+            <div>    
+                <small style="color: #b0b0b0; display: block; margin-top: 5px;">CharSet: "abcdefghijklmnñopqrstuvwxyzABCDEFGHJKLMNÑOPQRSTUVWXYZ"</small>
+                <small style="color: #b0b0b0; display: block; margin-top: 5px; margin-left: 40px;">"23456789!@#$%&/()=?,;.:-_áéíóúÁÉÍÓÚäëïöüÄËÏÖÜâêîôûÂÊÎÔÛ"</small>
+            </div>
             <div class="cat-selector-wrap">
                 <label data-i18n="passwords.cat.label">Category:</label>
                 <button type="button" class="cat-selector-btn" id="edit-cat-btn"
@@ -2055,6 +2063,50 @@ b){var c={},d;for(d=0;d<b.length;d++)void 0!==a[b[d]]&&(c[b[d]]=a[b[d]]);return 
 </div>
 
 <script>
+// Seleccionamos el campo de texto
+const CheckPasswordField = document.getElementById('password-value');
+
+// Escuchamos el evento keydown
+CheckPasswordField.addEventListener('keydown', function (event) {
+    const tecla = event.key;
+
+    // Regex de caracteres permitidos
+    const permitidos = /^[a-z2-9ABCDEFGHJKLMNOPQRSTUVWXYñÑáéíóúÁÉÍÓÚäëïöüÄËÏÖÜâêîôûÂÊÎÔÛ!@#$%&/()=?,;.:\-_]$/;
+
+    // Lista de teclas especiales que sí se permiten
+    const especiales = [
+        "Backspace", "Tab", "Enter", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Delete", "Home", "End"
+    ];
+
+    // Si no es especial y no coincide con la regex, bloquear
+    if (!permitidos.test(tecla) && !especiales.includes(tecla)) {
+        event.preventDefault();
+        console.log(`Tecla no permitida: ${tecla}`);
+    }
+});
+
+// Seleccionamos el campo de texto
+const CheckPasswordField2 = document.getElementById('edit-password-value');
+
+// Escuchamos el evento keydown
+CheckPasswordField2.addEventListener('keydown', function (event_edit) {
+    const tecla = event_edit.key;
+
+    // Regex de caracteres permitidos
+    const permitidos = /^[a-z2-9ABCDEFGHJKLMNOPQRSTUVWXYñÑáéíóúÁÉÍÓÚäëïöüÄËÏÖÜâêîôûÂÊÎÔÛ!@#$%&/()=?,;.:\-_]$/;
+
+    // Lista de teclas especiales que sí se permiten
+    const especiales = [
+        "Backspace", "Tab", "Enter", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Delete", "Home", "End"
+    ];
+
+    // Si no es especial y no coincide con la regex, bloquear
+    if (!permitidos.test(tecla) && !especiales.includes(tecla)) {
+        event.preventDefault();
+        console.log(`Tecla no permitida: ${tecla}`);
+    }
+});
+
 // ⚡ CACHE MANAGER - localStorage кеширование для снижения нагрузки на ESP32
 const CacheManager = {
     PREFIX: 'totp_cache_',

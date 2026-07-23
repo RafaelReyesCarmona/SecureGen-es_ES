@@ -432,36 +432,36 @@ void BleKeyboardManager::sendPassword(const char* password) {
           switch (c2) {
             case 0xB1: sendKey(0x33,NO_KEY_MOD); break; // key 'ñ'
             case 0x91: sendKey(0x33,BLE_SHIFT); break;  // key 'Ñ'
-            case 0xA1: sendKey('\'',NO_KEY_MOD); sendKey('a',NO_KEY_MOD); break;     // key 'á' 
-            case 0x81: sendKey('\'',NO_KEY_MOD); sendKey('a',BLE_SHIFT); break; // key 'Á'
-            case 0xA9: sendKey('\'',NO_KEY_MOD); sendKey('e',NO_KEY_MOD); break;     // key 'é' 
-            case 0x89: sendKey('\'',NO_KEY_MOD); sendKey('e',BLE_SHIFT); break; // key 'É'
-            case 0xAD: sendKey('\'',NO_KEY_MOD); sendKey('i',NO_KEY_MOD); break;     // key 'í' 
-            case 0x8D: sendKey('\'',NO_KEY_MOD); sendKey('i',BLE_SHIFT); break; // key 'Í'
-            case 0xB3: sendKey('\'',NO_KEY_MOD); sendKey('o',NO_KEY_MOD); break;     // key 'ó' 
-            case 0x93: sendKey('\'',NO_KEY_MOD); sendKey('o',BLE_SHIFT); break; // key 'Ó'
-            case 0xBA: sendKey('\'',NO_KEY_MOD); sendKey('u',NO_KEY_MOD); break;     // key 'ú' 
-            case 0x9A: sendKey('\'',NO_KEY_MOD); sendKey('u',BLE_SHIFT); break; // key 'Ú'
-            case 0xA2: sendKey('[',BLE_SHIFT); sendKey('a',NO_KEY_MOD); break;     // key 'â' 
-            case 0x82: sendKey('[',BLE_SHIFT); sendKey('a',BLE_SHIFT); break;     // key 'Â' 
-            case 0xAA: sendKey('[',BLE_SHIFT); sendKey('e',NO_KEY_MOD); break;     // key 'ê' 
-            case 0x8A: sendKey('[',BLE_SHIFT); sendKey('e',BLE_SHIFT); break;     // key 'Ê' 
-            case 0xAE: sendKey('[',BLE_SHIFT); sendKey('i',NO_KEY_MOD); break;     // key 'î' 
-            case 0x8E: sendKey('[',BLE_SHIFT); sendKey('i',BLE_SHIFT); break;     // key 'Î' 
-            case 0xB4: sendKey('[',BLE_SHIFT); sendKey('o',NO_KEY_MOD); break;     // key 'ô' 
-            case 0x94: sendKey('[',BLE_SHIFT); sendKey('o',BLE_SHIFT); break;     // key 'Ô' 
-            case 0xBB: sendKey('[',BLE_SHIFT); sendKey('u',NO_KEY_MOD); break;     // key 'û' 
-            case 0x9B: sendKey('[',BLE_SHIFT); sendKey('u',BLE_SHIFT); break;     // key 'Û' 
-            case 0xA4: sendKey('\'',BLE_SHIFT); sendKey('a',NO_KEY_MOD); break;     // key 'ä' 
-            case 0x84: sendKey('\'',BLE_SHIFT); sendKey('a',BLE_SHIFT); break;     // key 'Ä' 
-            case 0xAB: sendKey('\'',BLE_SHIFT); sendKey('e',NO_KEY_MOD); break;     // key 'ë' 
-            case 0x8B: sendKey('\'',BLE_SHIFT); sendKey('e',BLE_SHIFT); break;     // key 'Ë' 
-            case 0xAF: sendKey('\'',BLE_SHIFT); sendKey('i',NO_KEY_MOD); break;     // key 'ï' 
-            case 0x8F: sendKey('\'',BLE_SHIFT); sendKey('i',BLE_SHIFT); break;     // key 'Ï' 
-            case 0xB6: sendKey('\'',BLE_SHIFT); sendKey('o',NO_KEY_MOD); break;     // key 'ö' 
-            case 0x96: sendKey('\'',BLE_SHIFT); sendKey('o',BLE_SHIFT); break;     // key 'Ö' 
-            case 0xBC: sendKey('\'',BLE_SHIFT); sendKey('u',NO_KEY_MOD); break;     // key 'ü' 
-            case 0x9C: sendKey('\'',BLE_SHIFT); sendKey('u',BLE_SHIFT); break;     // key 'Ü'
+            case 0xA1: sendKey(0x34,NO_KEY_MOD); write('a',NO_KEY_MOD); break;     // key 'á' 
+            case 0x81: sendKey(0x34,NO_KEY_MOD); write('a',BLE_SHIFT); break; // key 'Á'
+            case 0xA9: sendKey(0x34,NO_KEY_MOD); write('e',NO_KEY_MOD); break;     // key 'é' 
+            case 0x89: sendKey(0x34,NO_KEY_MOD); write('e',BLE_SHIFT); break; // key 'É'
+            case 0xAD: sendKey(0x34,NO_KEY_MOD); write('i',NO_KEY_MOD); break;     // key 'í' 
+            case 0x8D: sendKey(0x34,NO_KEY_MOD); write('i',BLE_SHIFT); break; // key 'Í'
+            case 0xB3: sendKey(0x34,NO_KEY_MOD); write('o',NO_KEY_MOD); break;     // key 'ó' 
+            case 0x93: sendKey(0x34,NO_KEY_MOD); write('o',BLE_SHIFT); break; // key 'Ó'
+            case 0xBA: sendKey(0x34,NO_KEY_MOD); write('u',NO_KEY_MOD); break;     // key 'ú' 
+            case 0x9A: sendKey(0x34,NO_KEY_MOD); write('u',BLE_SHIFT); break; // key 'Ú'
+            case 0xA2: sendKey(0x2F,BLE_SHIFT); write('a',NO_KEY_MOD); break;     // key 'â' 
+            case 0x82: sendKey(0x2F,BLE_SHIFT); write('a',BLE_SHIFT); break;     // key 'Â' 
+            case 0xAA: sendKey(0x2F,BLE_SHIFT); write('e',NO_KEY_MOD); break;     // key 'ê' 
+            case 0x8A: sendKey(0x2F,BLE_SHIFT); write('e',BLE_SHIFT); break;     // key 'Ê' 
+            case 0xAE: sendKey(0x2F,BLE_SHIFT); write('i',NO_KEY_MOD); break;     // key 'î' 
+            case 0x8E: sendKey(0x2F,BLE_SHIFT); write('i',BLE_SHIFT); break;     // key 'Î' 
+            case 0xB4: sendKey(0x2F,BLE_SHIFT); write('o',NO_KEY_MOD); break;     // key 'ô' 
+            case 0x94: sendKey(0x2F,BLE_SHIFT); write('o',BLE_SHIFT); break;     // key 'Ô' 
+            case 0xBB: sendKey(0x2F,BLE_SHIFT); write('u',NO_KEY_MOD); break;     // key 'û' 
+            case 0x9B: sendKey(0x2F,BLE_SHIFT); write('u',BLE_SHIFT); break;     // key 'Û' 
+            case 0xA4: sendKey(0x34,BLE_SHIFT); write('a',NO_KEY_MOD); break;     // key 'ä' 
+            case 0x84: sendKey(0x34,BLE_SHIFT); write('a',BLE_SHIFT); break;     // key 'Ä' 
+            case 0xAB: sendKey(0x34,BLE_SHIFT); write('e',NO_KEY_MOD); break;     // key 'ë' 
+            case 0x8B: sendKey(0x34,BLE_SHIFT); write('e',BLE_SHIFT); break;     // key 'Ë' 
+            case 0xAF: sendKey(0x34,BLE_SHIFT); write('i',NO_KEY_MOD); break;     // key 'ï' 
+            case 0x8F: sendKey(0x34,BLE_SHIFT); write('i',BLE_SHIFT); break;     // key 'Ï' 
+            case 0xB6: sendKey(0x34,BLE_SHIFT); write('o',NO_KEY_MOD); break;     // key 'ö' 
+            case 0x96: sendKey(0x34,BLE_SHIFT); write('o',BLE_SHIFT); break;     // key 'Ö' 
+            case 0xBC: sendKey(0x34,BLE_SHIFT); write('u',NO_KEY_MOD); break;     // key 'ü' 
+            case 0x9C: sendKey(0x34,BLE_SHIFT); write('u',BLE_SHIFT); break;     // key 'Ü'
           } // end switch c2
         //} else if  (c == 0xC2) {
           //password++;
@@ -472,18 +472,18 @@ void BleKeyboardManager::sendPassword(const char* password) {
           //} // end switch c2
         }  else { // end if
             switch(c) {
-          case '@': sendKey('2',BLE_ALTGR); break;
-          case '#': sendKey('3',BLE_ALTGR); break;
-          case '&': sendKey('6',BLE_SHIFT); break;
-          case '/': sendKey('7',BLE_SHIFT); break;
-          case '(': sendKey('8',BLE_SHIFT); break;
-          case ')': sendKey('9',BLE_SHIFT); break;
-          case '=': sendKey('0',BLE_SHIFT); break;
-          case '?': sendKey('_',BLE_SHIFT); break;
-          case '-': sendKey('/',NO_KEY_MOD); break;
-          case '_': sendKey('/',BLE_SHIFT); break;
-          case ';': sendKey(',',BLE_SHIFT); break;
-          case ':': sendKey('.',BLE_SHIFT); break;
+          case '@': write('2',BLE_ALTGR); break;
+          case '#': write('3',BLE_ALTGR); break;
+          case '&': write('6',BLE_SHIFT); break;
+          case '/': write('7',BLE_SHIFT); break;
+          case '(': write('8',BLE_SHIFT); break;
+          case ')': write('9',BLE_SHIFT); break;
+          case '=': write('0',BLE_SHIFT); break;
+          case '?': write('_',BLE_SHIFT); break;
+          case '-': write('/',NO_KEY_MOD); break;
+          case '_': write('/',BLE_SHIFT); break;
+          case ';': write(',',BLE_SHIFT); break;
+          case ':': write('.',BLE_SHIFT); break;
             default:
                 write((uint8_t)(c));
             }
