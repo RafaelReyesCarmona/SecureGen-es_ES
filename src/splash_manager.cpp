@@ -1,9 +1,9 @@
 #include "splash_manager.h"
 #include "LittleFS.h"
 #ifdef ARDUINO_LILYGO_T_DISPLAY_S3
-#include "embedded_splashes_s3.h"
+#include "embedded_splashes_s3-es_ES.h"
 #else
-#include "embedded_splashes.h"
+#include "embedded_splashes-es_ES.h"
 #endif
 #include "log_manager.h"
 #include <ArduinoJson.h>
@@ -20,29 +20,29 @@ void SplashScreenManager::displayEmbeddedSplash(const String& mode) {
     // 🎨 Модульный выбор splash screen
 #ifdef ARDUINO_LILYGO_T_DISPLAY_S3
     if (mode == "bladerunner") {
-        splashData = splash_s3_1;
-        splashLen = splash_s3_1_len;
-        splashName = "S3-Splash1";
+        splashData = __Logo_es_ES_S3_raw;
+        splashLen = __Logo_es_ES_S3_raw_len;
+        splashName = "Logo";
     } else if (mode == "combs") {
-        splashData = splash_s3_2;
-        splashLen = splash_s3_2_len;
-        splashName = "S3-Splash2";
-    } else if (mode == "securegen") {
-        splashData = splash_s3_3;
-        splashLen = splash_s3_3_len;
-        splashName = "S3-Splash3";
-#else
-    if (mode == "bladerunner") {
-        splashData = splash_bladerunner;
-        splashLen = splash_bladerunner_len;
-        splashName = "BladeRunner";
-    } else if (mode == "combs") {
-        splashData = splash_combs;
-        splashLen = splash_combs_len;
+        splashData = __Combs_es_ES_S3_raw;
+        splashLen = __Combs_es_ES_S3_raw_len;
         splashName = "Combs";
     } else if (mode == "securegen") {
-        splashData = splash_securegen;
-        splashLen = splash_securegen_len;
+        splashData = __SecureGen_es_ES_S3_raw;
+        splashLen = __SecureGen_es_ES_S3_raw_len;
+        splashName = "SecureGen";
+#else
+    if (mode == "bladerunner") {
+        splashData = __Logo_es_ES_raw;
+        splashLen = __Logo_es_ES_raw_len;
+        splashName = "Logo";
+    } else if (mode == "combs") {
+        splashData = __Combs_es_ES_raw;
+        splashLen = __Combs_es_ES_raw_len;
+        splashName = "Combs";
+    } else if (mode == "securegen") {
+        splashData = __SecureGen_es_ES_raw;
+        splashLen = __SecureGen_es_ES_raw_len;
         splashName = "SecureGen";
 #endif
     } else if (mode == "disabled") {
