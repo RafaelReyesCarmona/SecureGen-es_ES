@@ -1,4 +1,5 @@
 <div align=center><img src="assets/splash_screens-es_ES/SecureGen-es_ES_Github-social.png" alt="SecureGen es_ES"></div>
+
 # Dispositivo de Seguridad Multifuncional ESP32 T-Display/S3
 
 <div align="center">
