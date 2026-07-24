@@ -31,6 +31,7 @@ void SplashScreenManager::displayEmbeddedSplash(const String& mode) {
         splashData = __SecureGen_es_ES_S3_raw;
         splashLen = __SecureGen_es_ES_S3_raw_len;
         splashName = "SecureGen";
+    }
 #else
     if (mode == "bladerunner") {
         splashData = __Logo_es_ES_raw;
@@ -44,8 +45,9 @@ void SplashScreenManager::displayEmbeddedSplash(const String& mode) {
         splashData = __SecureGen_es_ES_raw;
         splashLen = __SecureGen_es_ES_raw_len;
         splashName = "SecureGen";
+    }
 #endif
-    } else if (mode == "disabled") {
+    else if (mode == "disabled") {
         LOG_INFO("SplashManager", "❌ Splash screen disabled by config");
         return; // Не показываем splash
     } else {
